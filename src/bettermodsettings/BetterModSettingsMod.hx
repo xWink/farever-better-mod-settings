@@ -1,7 +1,6 @@
 package bettermodsettings;
 
 import haxe.Json;
-import imgui.ImGui;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -11,6 +10,7 @@ class BetterModSettingsMod {
     static var modSettingsButton:Dynamic;
     static var nativeSettingsWindow:Dynamic;
     static var compatibleMods:Array<Dynamic> = [];
+    static var capturingKeybind:Dynamic;
 
     static var propertiesType:hl.Bytes;
     static var uiElementType:hl.Bytes;
@@ -18,6 +18,8 @@ class BetterModSettingsMod {
     static var titleWindowType:hl.Bytes;
     static var flowType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
+    static var buttonType:hl.Bytes;
+    static var hxdKeyType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
     static var setOnClickMember:hlx.runtime.ResolvedMember;
@@ -27,10 +29,16 @@ class BetterModSettingsMod {
     static var setVerticalSpacingMember:hlx.runtime.ResolvedMember;
     static var setHorizontalSpacingMember:hlx.runtime.ResolvedMember;
     static var setSelectedMember:hlx.runtime.ResolvedMember;
+    static var setButtonTextMember:hlx.runtime.ResolvedMember;
+    static var isKeyPressedMember:hlx.runtime.ResolvedMember;
+    static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
 
-    static function main():Void {
-        ImGui.register(HlxRuntime.moduleName(), draw);
+    static function main():Void {}
+
+    @:hlx.postfix(GameApp.update)
+    static function afterGameAppUpdate(instance:Dynamic, dt:Float, result:Void):Void {
+        capturePressedKey();
     }
 
     @:hlx.postfix(ui.win.EscapeMenu.init)
@@ -146,8 +154,6 @@ class BetterModSettingsMod {
             trace("[BetterModSettings] Could not open native settings window: " + Std.string(error));
         }
     }
-
-    static function draw():Void {}
 
     static function sizeContent(contentProperties:Dynamic):Void {
         try {
@@ -346,8 +352,92 @@ class BetterModSettingsMod {
                         saveSetting(targetMod, targetKey, newValue);
                     });
                 }
+            } else if (type == "keybinding") {
+                createText(settingParent, label, "settingLabel" + index);
+                var keyCode = intValue(Reflect.field(mod, "values"), key, 0);
+                var keyProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+                    "button",
+                    settingParent,
+                    [keyName(keyCode)],
+                    { id: "setting" + index }
+                ]);
+                var keyButton:Dynamic = keyProperties == null
+                    ? null
+                    : HlxRuntime.resolveField(keyProperties, "obj");
+                if (keyButton != null) {
+                    var targetMod = mod;
+                    var targetKey = key;
+                    HlxRuntime.callResolved(setOnClickMember, [keyButton, function():Void {
+                        beginKeyCapture(targetMod, targetKey, keyButton);
+                    }]);
+                }
             }
         }
+    }
+
+    static function beginKeyCapture(mod:Dynamic, key:String, button:Dynamic):Void {
+        capturingKeybind = { mod: mod, key: key, button: button };
+        setKeyButtonText(button, "Press a key...");
+    }
+
+    static function capturePressedKey():Void {
+        if (capturingKeybind == null)
+            return;
+        if (hxdKeyType == null)
+            hxdKeyType = HlxRuntime.resolveType("hxd.Key");
+        if (hxdKeyType == null)
+            return;
+        if (isKeyPressedMember == null)
+            isKeyPressedMember = HlxRuntime.resolveStaticMember(hxdKeyType, "isPressed");
+        if (isKeyPressedMember == null)
+            return;
+
+        for (keyCode in 1...512) {
+            var pressed:Dynamic = HlxRuntime.callResolved(isKeyPressedMember, [keyCode]);
+            if (pressed != true)
+                continue;
+            var capture = capturingKeybind;
+            capturingKeybind = null;
+            if (keyCode == 27) {
+                var values:Dynamic = Reflect.field(Reflect.field(capture, "mod"), "values");
+                setKeyButtonText(
+                    Reflect.field(capture, "button"),
+                    keyName(intValue(values, Std.string(Reflect.field(capture, "key")), 0))
+                );
+                return;
+            }
+            saveSetting(
+                Reflect.field(capture, "mod"),
+                Std.string(Reflect.field(capture, "key")),
+                keyCode
+            );
+            setKeyButtonText(Reflect.field(capture, "button"), keyName(keyCode));
+            return;
+        }
+    }
+
+    static function setKeyButtonText(button:Dynamic, text:String):Void {
+        if (buttonType == null)
+            buttonType = HlxRuntime.resolveType("ui.comp.Button");
+        if (buttonType != null && setButtonTextMember == null)
+            setButtonTextMember = HlxRuntime.resolveMember(buttonType, "set_text");
+        if (setButtonTextMember != null)
+            HlxRuntime.callResolved(setButtonTextMember, [button, text]);
+    }
+
+    static function keyName(keyCode:Int):String {
+        if (keyCode <= 0)
+            return "Not set";
+        if (hxdKeyType == null)
+            hxdKeyType = HlxRuntime.resolveType("hxd.Key");
+        if (hxdKeyType != null && getKeyNameMember == null)
+            getKeyNameMember = HlxRuntime.resolveStaticMember(hxdKeyType, "getKeyName");
+        if (getKeyNameMember != null) {
+            var name:Dynamic = HlxRuntime.callResolved(getKeyNameMember, [keyCode]);
+            if (name != null && Std.string(name).length > 0)
+                return Std.string(name);
+        }
+        return "Key " + keyCode;
     }
 
     static function styleFlow(
@@ -442,6 +532,13 @@ class BetterModSettingsMod {
         if (object == null || !Reflect.hasField(object, key))
             return fallback;
         return Reflect.field(object, key) == true;
+    }
+
+    static function intValue(object:Dynamic, key:String, fallback:Int):Int {
+        if (object == null || !Reflect.hasField(object, key))
+            return fallback;
+        var value:Dynamic = Reflect.field(object, key);
+        return value == null ? fallback : cast value;
     }
 
     static function numberValue(object:Dynamic, key:String, fallback:Float):Float {
