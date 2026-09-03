@@ -25,6 +25,8 @@ class BetterModSettingsMod {
     static var setOnClickMember:hlx.runtime.ResolvedMember;
     static var setMinWidthMember:hlx.runtime.ResolvedMember;
     static var setMinHeightMember:hlx.runtime.ResolvedMember;
+    static var setMaxWidthMember:hlx.runtime.ResolvedMember;
+    static var setMaxHeightMember:hlx.runtime.ResolvedMember;
     static var setPaddingMember:hlx.runtime.ResolvedMember;
     static var setPaddingLeftMember:hlx.runtime.ResolvedMember;
     static var setPaddingRightMember:hlx.runtime.ResolvedMember;
@@ -147,6 +149,7 @@ class BetterModSettingsMod {
 
             sizeContent(contentProperties);
             styleFlow(contentProperties, 24, 18, 0);
+            setHorizontalPadding(contentProperties, 64);
             discoverCompatibleMods();
             buildSettingsContent(contentProperties);
 
@@ -167,6 +170,10 @@ class BetterModSettingsMod {
                 setMinWidthMember = HlxRuntime.resolveMember(flowType, "set_minWidth");
             if (setMinHeightMember == null)
                 setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
+            if (setMaxWidthMember == null)
+                setMaxWidthMember = HlxRuntime.resolveMember(flowType, "set_maxWidth");
+            if (setMaxHeightMember == null)
+                setMaxHeightMember = HlxRuntime.resolveMember(flowType, "set_maxHeight");
 
             var content:Dynamic = HlxRuntime.resolveField(contentProperties, "obj");
             if (content == null)
@@ -175,6 +182,10 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(setMinWidthMember, [content, 900]);
             if (setMinHeightMember != null)
                 HlxRuntime.callResolved(setMinHeightMember, [content, 540]);
+            if (setMaxWidthMember != null)
+                HlxRuntime.callResolved(setMaxWidthMember, [content, 900]);
+            if (setMaxHeightMember != null)
+                HlxRuntime.callResolved(setMaxHeightMember, [content, 540]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size native window: " + Std.string(error));
         }
@@ -265,6 +276,7 @@ class BetterModSettingsMod {
                 id: "modPanel" + index,
                 layout: "vertical"
             };
+            Reflect.setField(panelAttributes, "class", "content in-option-group");
             var panelProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "flow", contentProperties, [], panelAttributes
             ]);
@@ -274,7 +286,6 @@ class BetterModSettingsMod {
             panels.push(panel);
             if (panelProperties != null) {
                 styleFlow(panelProperties, 4, 14, 0);
-                setHorizontalPadding(panelProperties, 60);
                 buildModSettings(panelProperties, mod);
             }
         }
@@ -312,7 +323,7 @@ class BetterModSettingsMod {
                 var checkProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                     "check-box",
                     settingParent,
-                    [label],
+                    [""],
                     { id: "setting" + index }
                 ]);
                 var check:Dynamic = checkProperties == null
