@@ -403,10 +403,12 @@ class BetterModSettingsMod {
 
     static function saveSetting(mod:Dynamic, key:String, value:Dynamic):Void {
         try {
-            var values:Dynamic = Reflect.field(mod, "values");
+            var settingsPath = Std.string(Reflect.field(mod, "settingsPath"));
+            var values:Dynamic = Json.parse(File.getContent(settingsPath));
             Reflect.setField(values, key, value);
+            Reflect.setField(mod, "values", values);
             File.saveContent(
-                Std.string(Reflect.field(mod, "settingsPath")),
+                settingsPath,
                 Json.stringify(values, null, "  ")
             );
             trace("[BetterModSettings] Saved " + key);
