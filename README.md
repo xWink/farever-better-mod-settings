@@ -1,6 +1,6 @@
 # Better Mod Settings
 
-Adds a **Mod Settings** button to Farever's Escape menu. The initial implementation opens a placeholder settings window; automatic compatible-mod discovery and generated controls will follow.
+Adds a **Mod Settings** button to Farever's Escape menu. The initial implementation opens a placeholder settings window; automatic compatible-mod discovery and generated controls will follow. This first milestone is intended to verify the native Escape-menu integration.
 
 ## Building
 
