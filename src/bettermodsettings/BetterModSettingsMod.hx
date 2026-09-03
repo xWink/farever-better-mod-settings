@@ -23,6 +23,9 @@ class BetterModSettingsMod {
     static var setOnClickMember:hlx.runtime.ResolvedMember;
     static var setMinWidthMember:hlx.runtime.ResolvedMember;
     static var setMinHeightMember:hlx.runtime.ResolvedMember;
+    static var setPaddingMember:hlx.runtime.ResolvedMember;
+    static var setVerticalSpacingMember:hlx.runtime.ResolvedMember;
+    static var setHorizontalSpacingMember:hlx.runtime.ResolvedMember;
     static var setSelectedMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
 
@@ -133,6 +136,7 @@ class BetterModSettingsMod {
                 return;
 
             sizeContent(contentProperties);
+            styleFlow(contentProperties, 24, 18, 0);
             discoverCompatibleMods();
             buildSettingsContent(contentProperties);
 
@@ -229,6 +233,7 @@ class BetterModSettingsMod {
         var tabs:Dynamic = HlxRuntime.callResolved(createNewMember, [
             "flow", contentProperties, [], tabsAttributes
         ]);
+        styleFlow(tabs, 0, 0, 10);
 
         var panels:Array<Dynamic> = [];
         for (index in 0...compatibleMods.length) {
@@ -258,8 +263,10 @@ class BetterModSettingsMod {
                 ? null
                 : HlxRuntime.resolveField(panelProperties, "obj");
             panels.push(panel);
-            if (panelProperties != null)
+            if (panelProperties != null) {
+                styleFlow(panelProperties, 4, 14, 0);
                 buildModSettings(panelProperties, mod);
+            }
         }
         showPanel(panels, 0);
     }
@@ -289,11 +296,20 @@ class BetterModSettingsMod {
             if (key.length == 0)
                 continue;
 
+            var rowProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+                "flow",
+                parentProperties,
+                [],
+                { id: "settingRow" + index, layout: "vertical" }
+            ]);
+            var settingParent = rowProperties == null ? parentProperties : rowProperties;
+            styleFlow(rowProperties, 0, 6, 0);
+
             if (type == "checkbox") {
                 var checked = boolValue(Reflect.field(mod, "values"), key, false);
                 var checkProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                     "check-box",
-                    parentProperties,
+                    settingParent,
                     [label],
                     { id: "setting" + index }
                 ]);
@@ -309,14 +325,14 @@ class BetterModSettingsMod {
                     });
                 }
             } else if (type == "slider") {
-                createText(parentProperties, label, "settingLabel" + index);
+                createText(settingParent, label, "settingLabel" + index);
                 var min = numberField(definition, "min", 0.0);
                 var max = numberField(definition, "max", 100.0);
                 var step = numberField(definition, "step", 1.0);
                 var value = numberValue(Reflect.field(mod, "values"), key, min);
                 var sliderProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                     "slider",
-                    parentProperties,
+                    settingParent,
                     [min, max, step, value],
                     { id: "setting" + index }
                 ]);
@@ -331,6 +347,40 @@ class BetterModSettingsMod {
                     });
                 }
             }
+        }
+    }
+
+    static function styleFlow(
+        properties:Dynamic,
+        padding:Int,
+        verticalSpacing:Int,
+        horizontalSpacing:Int
+    ):Void {
+        if (properties == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType == null)
+                return;
+            if (setPaddingMember == null)
+                setPaddingMember = HlxRuntime.resolveMember(flowType, "set_padding");
+            if (setVerticalSpacingMember == null)
+                setVerticalSpacingMember = HlxRuntime.resolveMember(flowType, "set_verticalSpacing");
+            if (setHorizontalSpacingMember == null)
+                setHorizontalSpacingMember = HlxRuntime.resolveMember(flowType, "set_horizontalSpacing");
+
+            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            if (flow == null)
+                return;
+            if (setPaddingMember != null)
+                HlxRuntime.callResolved(setPaddingMember, [flow, padding]);
+            if (setVerticalSpacingMember != null)
+                HlxRuntime.callResolved(setVerticalSpacingMember, [flow, verticalSpacing]);
+            if (setHorizontalSpacingMember != null)
+                HlxRuntime.callResolved(setHorizontalSpacingMember, [flow, horizontalSpacing]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not style settings flow: " + Std.string(error));
         }
     }
 
