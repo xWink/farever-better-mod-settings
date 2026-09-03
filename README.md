@@ -4,12 +4,11 @@ Adds a **Mod Settings** button to Farever's Escape menu and presents compatible 
 
 ## Mod compatibility
 
-A compatible mod includes a `settingFormats.json` file in its own mod folder. The descriptor identifies the mod's existing settings file, so adopting Better Mod Settings does not require renaming or migrating configuration:
+A compatible mod includes a `configFormats.json` file in its own mod folder. The descriptor identifies the mod's existing settings file, so adopting Better Mod Settings does not require renaming or migrating configuration:
 
 ```json
 {
   "schemaVersion": 1,
-  "modId": "example-mod",
   "displayName": "Example Mod",
   "settingsFile": "config.json",
   "settings": [
