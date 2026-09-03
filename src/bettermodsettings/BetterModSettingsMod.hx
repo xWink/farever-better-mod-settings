@@ -119,8 +119,10 @@ class BetterModSettingsMod {
                 return;
             }
 
-            var contentAttributes:Dynamic = { id: "betterModSettingsContent" };
-            Reflect.setField(contentAttributes, "class", "content");
+            var contentAttributes:Dynamic = {
+                id: "betterModSettingsContent",
+                layout: "vertical"
+            };
             var contentProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "flow",
                 windowProperties,
@@ -182,16 +184,16 @@ class BetterModSettingsMod {
 
                 try {
                     var format:Dynamic = Json.parse(File.getContent(formatPath));
-                    var settingsFile = stringField(format, "settingsFile", "settings.json");
-                    if (!isSafeSettingsFileName(settingsFile)) {
-                        trace("[BetterModSettings] Skipping " + folder + ": invalid settingsFile");
+                    var configFile = stringField(format, "configFile", "config.json");
+                    if (!isSafeConfigFileName(configFile)) {
+                        trace("[BetterModSettings] Skipping " + folder + ": invalid configFile");
                         continue;
                     }
-                    var settingsPath = folderPath + "/" + settingsFile;
+                    var settingsPath = folderPath + "/" + configFile;
                     if (!FileSystem.exists(settingsPath))
                         continue;
                     var values:Dynamic = Json.parse(File.getContent(settingsPath));
-                    var definitions:Array<Dynamic> = cast Reflect.field(format, "settings");
+                    var definitions:Array<Dynamic> = cast Reflect.field(format, "configs");
                     if (definitions == null)
                         continue;
                     compatibleMods.push({
@@ -245,8 +247,10 @@ class BetterModSettingsMod {
                 }]);
             }
 
-            var panelAttributes:Dynamic = { id: "modPanel" + index };
-            Reflect.setField(panelAttributes, "class", "content");
+            var panelAttributes:Dynamic = {
+                id: "modPanel" + index,
+                layout: "vertical"
+            };
             var panelProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "flow", contentProperties, [], panelAttributes
             ]);
@@ -368,7 +372,7 @@ class BetterModSettingsMod {
         return value == null ? fallback : Std.string(value);
     }
 
-    static function isSafeSettingsFileName(fileName:String):Bool {
+    static function isSafeConfigFileName(fileName:String):Bool {
         return fileName.length > 0
             && fileName.indexOf("/") < 0
             && fileName.indexOf("\\") < 0
