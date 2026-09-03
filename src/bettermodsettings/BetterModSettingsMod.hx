@@ -1,19 +1,28 @@
 package bettermodsettings;
 
+import haxe.Json;
 import imgui.ImGui;
+import sys.FileSystem;
+import sys.io.File;
 
 @:build(hlx.runtime.Mod.build())
 class BetterModSettingsMod {
     static var activeEscapeMenu:Dynamic;
     static var modSettingsButton:Dynamic;
     static var nativeSettingsWindow:Dynamic;
+    static var compatibleMods:Array<Dynamic> = [];
 
     static var propertiesType:hl.Bytes;
     static var uiElementType:hl.Bytes;
     static var titleWindowType:hl.Bytes;
+    static var flowType:hl.Bytes;
+    static var checkBoxType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
     static var setOnClickMember:hlx.runtime.ResolvedMember;
+    static var setMinWidthMember:hlx.runtime.ResolvedMember;
+    static var setMinHeightMember:hlx.runtime.ResolvedMember;
+    static var setSelectedMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {
         ImGui.register(HlxRuntime.moduleName(), draw);
@@ -116,14 +125,12 @@ class BetterModSettingsMod {
                 [],
                 contentAttributes
             ]);
-            if (contentProperties != null) {
-                HlxRuntime.callResolved(createNewMember, [
-                    "text",
-                    contentProperties,
-                    ["Compatible mod settings will appear here."],
-                    { id: "betterModSettingsPlaceholder" }
-                ]);
-            }
+            if (contentProperties == null)
+                return;
+
+            sizeContent(contentProperties);
+            discoverCompatibleMods();
+            buildSettingsContent(contentProperties);
 
             trace("[BetterModSettings] Native Mod Settings window opened");
         } catch (error:Dynamic) {
@@ -133,6 +140,220 @@ class BetterModSettingsMod {
     }
 
     static function draw():Void {}
+
+    static function sizeContent(contentProperties:Dynamic):Void {
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType == null)
+                return;
+            if (setMinWidthMember == null)
+                setMinWidthMember = HlxRuntime.resolveMember(flowType, "set_minWidth");
+            if (setMinHeightMember == null)
+                setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
+
+            var content:Dynamic = HlxRuntime.resolveField(contentProperties, "obj");
+            if (content == null)
+                return;
+            if (setMinWidthMember != null)
+                HlxRuntime.callResolved(setMinWidthMember, [content, 900]);
+            if (setMinHeightMember != null)
+                HlxRuntime.callResolved(setMinHeightMember, [content, 540]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not size native window: " + Std.string(error));
+        }
+    }
+
+    static function discoverCompatibleMods():Void {
+        compatibleMods = [];
+        var modsPath = "hlx/mods";
+        try {
+            if (!FileSystem.exists(modsPath) || !FileSystem.isDirectory(modsPath))
+                return;
+
+            for (folder in FileSystem.readDirectory(modsPath)) {
+                var folderPath = modsPath + "/" + folder;
+                var formatPath = folderPath + "/settingFormats.json";
+                var settingsPath = folderPath + "/settings.json";
+                if (!FileSystem.isDirectory(folderPath)
+                    || !FileSystem.exists(formatPath)
+                    || !FileSystem.exists(settingsPath))
+                    continue;
+
+                try {
+                    var format:Dynamic = Json.parse(File.getContent(formatPath));
+                    var values:Dynamic = Json.parse(File.getContent(settingsPath));
+                    var definitions:Array<Dynamic> = cast Reflect.field(format, "settings");
+                    if (definitions == null)
+                        continue;
+                    compatibleMods.push({
+                        id: stringField(format, "modId", folder),
+                        name: stringField(format, "displayName", folder),
+                        settingsPath: settingsPath,
+                        definitions: definitions,
+                        values: values
+                    });
+                } catch (error:Dynamic) {
+                    trace("[BetterModSettings] Skipping " + folder + ": " + Std.string(error));
+                }
+            }
+
+            compatibleMods.sort(function(a:Dynamic, b:Dynamic):Int {
+                var left = Std.string(Reflect.field(a, "name")).toLowerCase();
+                var right = Std.string(Reflect.field(b, "name")).toLowerCase();
+                return left < right ? -1 : (left > right ? 1 : 0);
+            });
+            trace("[BetterModSettings] Found " + compatibleMods.length + " compatible mod(s)");
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Mod discovery failed: " + Std.string(error));
+        }
+    }
+
+    static function buildSettingsContent(contentProperties:Dynamic):Void {
+        if (compatibleMods.length == 0) {
+            createText(contentProperties, "No compatible mods were found.", "noCompatibleMods");
+            return;
+        }
+
+        var tabsAttributes:Dynamic = { id: "modTabs" };
+        Reflect.setField(tabsAttributes, "class", "two-buttons");
+        var tabs:Dynamic = HlxRuntime.callResolved(createNewMember, [
+            "flow", contentProperties, [], tabsAttributes
+        ]);
+
+        for (index in 0...compatibleMods.length) {
+            var mod:Dynamic = compatibleMods[index];
+            var tab:Dynamic = HlxRuntime.callResolved(createNewMember, [
+                "button",
+                tabs,
+                [Std.string(Reflect.field(mod, "name"))],
+                { id: "modTab" + index }
+            ]);
+            var tabButton:Dynamic = tab == null ? null : HlxRuntime.resolveField(tab, "obj");
+            if (tabButton != null) {
+                var selectedMod = mod;
+                HlxRuntime.callResolved(setOnClickMember, [tabButton, function():Void {
+                    trace("[BetterModSettings] Tab selected: " + Std.string(Reflect.field(selectedMod, "name")));
+                }]);
+            }
+        }
+
+        buildModSettings(contentProperties, compatibleMods[0]);
+    }
+
+    static function buildModSettings(parentProperties:Dynamic, mod:Dynamic):Void {
+        createText(parentProperties, Std.string(Reflect.field(mod, "name")), "selectedModTitle");
+        var definitions:Array<Dynamic> = cast Reflect.field(mod, "definitions");
+        for (index in 0...definitions.length) {
+            var definition = definitions[index];
+            var key = stringField(definition, "key", "");
+            var type = stringField(definition, "type", "");
+            var label = stringField(definition, "label", key);
+            if (key.length == 0)
+                continue;
+
+            if (type == "checkbox") {
+                var checked = boolValue(Reflect.field(mod, "values"), key, false);
+                var checkProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+                    "check-box",
+                    parentProperties,
+                    [label],
+                    { id: "setting" + index }
+                ]);
+                var check:Dynamic = checkProperties == null
+                    ? null
+                    : HlxRuntime.resolveField(checkProperties, "obj");
+                if (check != null) {
+                    setCheckboxValue(check, checked);
+                    var targetMod = mod;
+                    var targetKey = key;
+                    HlxRuntime.setField(check, "onValueChange", function(value:Bool):Void {
+                        saveSetting(targetMod, targetKey, value);
+                    });
+                }
+            } else if (type == "slider") {
+                createText(parentProperties, label, "settingLabel" + index);
+                var min = numberField(definition, "min", 0.0);
+                var max = numberField(definition, "max", 100.0);
+                var step = numberField(definition, "step", 1.0);
+                var value = numberValue(Reflect.field(mod, "values"), key, min);
+                var sliderProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+                    "slider",
+                    parentProperties,
+                    [min, max, step, value],
+                    { id: "setting" + index }
+                ]);
+                var slider:Dynamic = sliderProperties == null
+                    ? null
+                    : HlxRuntime.resolveField(sliderProperties, "obj");
+                if (slider != null) {
+                    var targetMod = mod;
+                    var targetKey = key;
+                    HlxRuntime.setField(slider, "onChange", function(newValue:Float):Void {
+                        saveSetting(targetMod, targetKey, newValue);
+                    });
+                }
+            }
+        }
+    }
+
+    static function createText(parentProperties:Dynamic, text:String, id:String):Void {
+        HlxRuntime.callResolved(createNewMember, [
+            "text", parentProperties, [text], { id: id }
+        ]);
+    }
+
+    static function setCheckboxValue(check:Dynamic, value:Bool):Void {
+        if (checkBoxType == null)
+            checkBoxType = HlxRuntime.resolveType("ui.comp.CheckBox");
+        if (checkBoxType != null && setSelectedMember == null)
+            setSelectedMember = HlxRuntime.resolveMember(checkBoxType, "set_selected");
+        if (setSelectedMember != null)
+            HlxRuntime.callResolved(setSelectedMember, [check, value]);
+        else
+            HlxRuntime.setField(check, "selected", value);
+    }
+
+    static function saveSetting(mod:Dynamic, key:String, value:Dynamic):Void {
+        try {
+            var values:Dynamic = Reflect.field(mod, "values");
+            Reflect.setField(values, key, value);
+            File.saveContent(
+                Std.string(Reflect.field(mod, "settingsPath")),
+                Json.stringify(values, null, "  ")
+            );
+            trace("[BetterModSettings] Saved " + key);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not save " + key + ": " + Std.string(error));
+        }
+    }
+
+    static function stringField(object:Dynamic, key:String, fallback:String):String {
+        if (object == null || !Reflect.hasField(object, key))
+            return fallback;
+        var value:Dynamic = Reflect.field(object, key);
+        return value == null ? fallback : Std.string(value);
+    }
+
+    static function numberField(object:Dynamic, key:String, fallback:Float):Float {
+        if (object == null || !Reflect.hasField(object, key))
+            return fallback;
+        var value:Dynamic = Reflect.field(object, key);
+        return value == null ? fallback : cast value;
+    }
+
+    static function boolValue(object:Dynamic, key:String, fallback:Bool):Bool {
+        if (object == null || !Reflect.hasField(object, key))
+            return fallback;
+        return Reflect.field(object, key) == true;
+    }
+
+    static function numberValue(object:Dynamic, key:String, fallback:Float):Float {
+        if (object == null || !Reflect.hasField(object, key))
+            return fallback;
+        var value:Dynamic = Reflect.field(object, key);
+        return value == null ? fallback : cast value;
+    }
 
     static function resolveUiMembers():Bool {
         if (propertiesType == null)
