@@ -114,11 +114,13 @@ class BetterModSettingsMod {
                 return;
             }
 
+            var contentAttributes:Dynamic = { id: "betterModSettingsContent" };
+            Reflect.setField(contentAttributes, "class", "content");
             var contentProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "flow",
                 windowProperties,
                 [],
-                { id: "betterModSettingsContent", class: "content" }
+                contentAttributes
             ]);
             if (contentProperties != null) {
                 HlxRuntime.callResolved(createNewMember, [
