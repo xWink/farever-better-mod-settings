@@ -10,8 +10,8 @@ A compatible mod includes a `configFormats.json` file in its own mod folder. The
 {
   "schemaVersion": 1,
   "displayName": "Example Mod",
-  "settingsFile": "config.json",
-  "settings": [
+  "configFile": "config.json",
+  "configs": [
     {
       "key": "enabled",
       "type": "checkbox",
@@ -21,7 +21,7 @@ A compatible mod includes a `configFormats.json` file in its own mod folder. The
 }
 ```
 
-`settingsFile` must be a filename within the same mod folder. If omitted, it defaults to `settings.json` for compatibility with the original format.
+`configFile` must be a filename within the same mod folder. If omitted, it defaults to `config.json` for compatibility with the original format.
 
 ## Building
 
