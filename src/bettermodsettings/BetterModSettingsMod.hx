@@ -176,14 +176,20 @@ class BetterModSettingsMod {
             for (folder in FileSystem.readDirectory(modsPath)) {
                 var folderPath = modsPath + "/" + folder;
                 var formatPath = folderPath + "/settingFormats.json";
-                var settingsPath = folderPath + "/settings.json";
                 if (!FileSystem.isDirectory(folderPath)
-                    || !FileSystem.exists(formatPath)
-                    || !FileSystem.exists(settingsPath))
+                    || !FileSystem.exists(formatPath))
                     continue;
 
                 try {
                     var format:Dynamic = Json.parse(File.getContent(formatPath));
+                    var settingsFile = stringField(format, "settingsFile", "settings.json");
+                    if (!isSafeSettingsFileName(settingsFile)) {
+                        trace("[BetterModSettings] Skipping " + folder + ": invalid settingsFile");
+                        continue;
+                    }
+                    var settingsPath = folderPath + "/" + settingsFile;
+                    if (!FileSystem.exists(settingsPath))
+                        continue;
                     var values:Dynamic = Json.parse(File.getContent(settingsPath));
                     var definitions:Array<Dynamic> = cast Reflect.field(format, "settings");
                     if (definitions == null)
@@ -361,6 +367,13 @@ class BetterModSettingsMod {
             return fallback;
         var value:Dynamic = Reflect.field(object, key);
         return value == null ? fallback : Std.string(value);
+    }
+
+    static function isSafeSettingsFileName(fileName:String):Bool {
+        return fileName.length > 0
+            && fileName.indexOf("/") < 0
+            && fileName.indexOf("\\") < 0
+            && fileName.indexOf("..") < 0;
     }
 
     static function numberField(object:Dynamic, key:String, fallback:Float):Float {
