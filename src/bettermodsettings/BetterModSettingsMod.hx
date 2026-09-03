@@ -14,6 +14,7 @@ class BetterModSettingsMod {
 
     static var propertiesType:hl.Bytes;
     static var uiElementType:hl.Bytes;
+    static var h2dObjectType:hl.Bytes;
     static var titleWindowType:hl.Bytes;
     static var flowType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
@@ -23,6 +24,7 @@ class BetterModSettingsMod {
     static var setMinWidthMember:hlx.runtime.ResolvedMember;
     static var setMinHeightMember:hlx.runtime.ResolvedMember;
     static var setSelectedMember:hlx.runtime.ResolvedMember;
+    static var setVisibleMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {
         ImGui.register(HlxRuntime.moduleName(), draw);
@@ -221,6 +223,7 @@ class BetterModSettingsMod {
             "flow", contentProperties, [], tabsAttributes
         ]);
 
+        var panels:Array<Dynamic> = [];
         for (index in 0...compatibleMods.length) {
             var mod:Dynamic = compatibleMods[index];
             var tab:Dynamic = HlxRuntime.callResolved(createNewMember, [
@@ -231,14 +234,39 @@ class BetterModSettingsMod {
             ]);
             var tabButton:Dynamic = tab == null ? null : HlxRuntime.resolveField(tab, "obj");
             if (tabButton != null) {
-                var selectedMod = mod;
+                var selectedIndex = index;
                 HlxRuntime.callResolved(setOnClickMember, [tabButton, function():Void {
-                    trace("[BetterModSettings] Tab selected: " + Std.string(Reflect.field(selectedMod, "name")));
+                    showPanel(panels, selectedIndex);
                 }]);
             }
-        }
 
-        buildModSettings(contentProperties, compatibleMods[0]);
+            var panelAttributes:Dynamic = { id: "modPanel" + index };
+            Reflect.setField(panelAttributes, "class", "content");
+            var panelProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+                "flow", contentProperties, [], panelAttributes
+            ]);
+            var panel:Dynamic = panelProperties == null
+                ? null
+                : HlxRuntime.resolveField(panelProperties, "obj");
+            panels.push(panel);
+            if (panelProperties != null)
+                buildModSettings(panelProperties, mod);
+        }
+        showPanel(panels, 0);
+    }
+
+    static function showPanel(panels:Array<Dynamic>, selectedIndex:Int):Void {
+        if (h2dObjectType == null)
+            h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+        if (h2dObjectType != null && setVisibleMember == null)
+            setVisibleMember = HlxRuntime.resolveMember(h2dObjectType, "set_visible");
+        if (setVisibleMember == null)
+            return;
+
+        for (index in 0...panels.length) {
+            if (panels[index] != null)
+                HlxRuntime.callResolved(setVisibleMember, [panels[index], index == selectedIndex]);
+        }
     }
 
     static function buildModSettings(parentProperties:Dynamic, mod:Dynamic):Void {
