@@ -26,6 +26,8 @@ class BetterModSettingsMod {
     static var setMinWidthMember:hlx.runtime.ResolvedMember;
     static var setMinHeightMember:hlx.runtime.ResolvedMember;
     static var setPaddingMember:hlx.runtime.ResolvedMember;
+    static var setPaddingLeftMember:hlx.runtime.ResolvedMember;
+    static var setPaddingRightMember:hlx.runtime.ResolvedMember;
     static var setVerticalSpacingMember:hlx.runtime.ResolvedMember;
     static var setHorizontalSpacingMember:hlx.runtime.ResolvedMember;
     static var setSelectedMember:hlx.runtime.ResolvedMember;
@@ -229,6 +231,7 @@ class BetterModSettingsMod {
     }
 
     static function buildSettingsContent(contentProperties:Dynamic):Void {
+        createText(contentProperties, "Mod Settings", "title");
         if (compatibleMods.length == 0) {
             createText(contentProperties, "No compatible mods were found.", "noCompatibleMods");
             return;
@@ -271,6 +274,7 @@ class BetterModSettingsMod {
             panels.push(panel);
             if (panelProperties != null) {
                 styleFlow(panelProperties, 4, 14, 0);
+                setHorizontalPadding(panelProperties, 60);
                 buildModSettings(panelProperties, mod);
             }
         }
@@ -344,7 +348,6 @@ class BetterModSettingsMod {
                     });
                 }
             } else if (type == "keybinding") {
-                createText(settingParent, label, "settingLabel" + index);
                 var keyCode = intValue(Reflect.field(mod, "values"), key, 0);
                 var keyProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                     "button",
@@ -460,6 +463,30 @@ class BetterModSettingsMod {
                 return Std.string(name);
         }
         return "Key " + keyCode;
+    }
+
+    static function setHorizontalPadding(properties:Dynamic, padding:Int):Void {
+        if (properties == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType == null)
+                return;
+            if (setPaddingLeftMember == null)
+                setPaddingLeftMember = HlxRuntime.resolveMember(flowType, "set_paddingLeft");
+            if (setPaddingRightMember == null)
+                setPaddingRightMember = HlxRuntime.resolveMember(flowType, "set_paddingRight");
+            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            if (flow == null)
+                return;
+            if (setPaddingLeftMember != null)
+                HlxRuntime.callResolved(setPaddingLeftMember, [flow, padding]);
+            if (setPaddingRightMember != null)
+                HlxRuntime.callResolved(setPaddingRightMember, [flow, padding]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not inset settings panel: " + Std.string(error));
+        }
     }
 
     static function styleFlow(
