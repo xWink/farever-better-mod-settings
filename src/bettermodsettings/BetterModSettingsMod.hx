@@ -10,12 +10,9 @@ class BetterModSettingsMod {
 
     static var propertiesType:hl.Bytes;
     static var uiElementType:hl.Bytes;
-    static var h2dObjectType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
     static var setOnClickMember:hlx.runtime.ResolvedMember;
-    static var getChildIndexMember:hlx.runtime.ResolvedMember;
-    static var addChildAtMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {
         ImGui.register(HlxRuntime.moduleName(), draw);
@@ -24,24 +21,31 @@ class BetterModSettingsMod {
     @:hlx.postfix(ui.win.EscapeMenu.init)
     static function afterEscapeMenuInit(instance:Dynamic, result:Void):Void {
         modSettingsButton = null;
+        trace("[BetterModSettings] Escape menu init detected");
 
         try {
-            if (!resolveUiMembers())
+            if (!resolveUiMembers()) {
+                trace("[BetterModSettings] Required UI members were not resolved");
                 return;
+            }
 
             var optionsButton:Dynamic = HlxRuntime.resolveField(instance, "optionsBtn");
             var optionsProperties:Dynamic = optionsButton == null
                 ? null
                 : HlxRuntime.resolveField(optionsButton, "dom");
-            if (optionsProperties == null)
+            if (optionsProperties == null) {
+                trace("[BetterModSettings] Options button DOM was not found");
                 return;
+            }
 
             var menuListProperties:Dynamic = HlxRuntime.callResolved(
                 getParentPropertiesMember,
                 [optionsProperties]
             );
-            if (menuListProperties == null)
+            if (menuListProperties == null) {
+                trace("[BetterModSettings] Escape menu list DOM was not found");
                 return;
+            }
 
             var createdProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "button",
@@ -49,28 +53,19 @@ class BetterModSettingsMod {
                 ["Mod Settings"],
                 { id: "betterModSettingsButton" }
             ]);
-            if (createdProperties == null)
+            if (createdProperties == null) {
+                trace("[BetterModSettings] Button DOM creation returned null");
                 return;
+            }
 
             modSettingsButton = HlxRuntime.resolveField(createdProperties, "obj");
-            if (modSettingsButton == null)
+            if (modSettingsButton == null) {
+                trace("[BetterModSettings] Created button object was null");
                 return;
+            }
 
             HlxRuntime.callResolved(setOnClickMember, [modSettingsButton, openSettings]);
-
-            var menuList:Dynamic = HlxRuntime.resolveField(menuListProperties, "obj");
-            if (menuList != null) {
-                var optionsIndex:Dynamic = HlxRuntime.callResolved(
-                    getChildIndexMember,
-                    [menuList, optionsButton]
-                );
-                if (optionsIndex != null && cast optionsIndex >= 0) {
-                    HlxRuntime.callResolved(
-                        addChildAtMember,
-                        [menuList, modSettingsButton, cast optionsIndex + 1]
-                    );
-                }
-            }
+            trace("[BetterModSettings] Mod Settings button appended successfully");
         } catch (error:Dynamic) {
             modSettingsButton = null;
             trace("[BetterModSettings] Could not add Escape menu button: " + Std.string(error));
@@ -101,9 +96,7 @@ class BetterModSettingsMod {
             propertiesType = HlxRuntime.resolveType("domkit.Properties");
         if (uiElementType == null)
             uiElementType = HlxRuntime.resolveType("ui.UIElement");
-        if (h2dObjectType == null)
-            h2dObjectType = HlxRuntime.resolveType("h2d.Object");
-        if (propertiesType == null || uiElementType == null || h2dObjectType == null)
+        if (propertiesType == null || uiElementType == null)
             return false;
 
         if (createNewMember == null)
@@ -112,16 +105,8 @@ class BetterModSettingsMod {
             getParentPropertiesMember = HlxRuntime.resolveMember(propertiesType, "get_parent");
         if (setOnClickMember == null)
             setOnClickMember = HlxRuntime.resolveMember(uiElementType, "set_onClick");
-        if (getChildIndexMember == null)
-            getChildIndexMember = HlxRuntime.resolveMember(h2dObjectType, "getChildIndex");
-        if (addChildAtMember == null)
-            addChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "addChildAt");
-
         return createNewMember != null
             && getParentPropertiesMember != null
-            && setOnClickMember != null
-            && getChildIndexMember != null
-            && addChildAtMember != null;
+            && setOnClickMember != null;
     }
 }
-
