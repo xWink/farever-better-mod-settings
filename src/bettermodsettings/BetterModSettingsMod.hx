@@ -388,6 +388,7 @@ class BetterModSettingsMod {
             ]);
             if (lineProperties == null)
                 return parentProperties;
+            setFlowHorizontalSpacing(lineProperties, 12);
             var line:Dynamic = HlxRuntime.resolveField(lineProperties, "obj");
             var container:Dynamic = line == null ? null : HlxRuntime.resolveField(line, "container");
             var containerProperties:Dynamic = container == null
@@ -463,6 +464,22 @@ class BetterModSettingsMod {
                 return Std.string(name);
         }
         return "Key " + keyCode;
+    }
+
+    static function setFlowHorizontalSpacing(properties:Dynamic, spacing:Int):Void {
+        if (properties == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType != null && setHorizontalSpacingMember == null)
+                setHorizontalSpacingMember = HlxRuntime.resolveMember(flowType, "set_horizontalSpacing");
+            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            if (flow != null && setHorizontalSpacingMember != null)
+                HlxRuntime.callResolved(setHorizontalSpacingMember, [flow, spacing]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not space native option row: " + Std.string(error));
+        }
     }
 
     static function setHorizontalPadding(properties:Dynamic, padding:Int):Void {
