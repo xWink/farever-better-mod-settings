@@ -292,7 +292,6 @@ class BetterModSettingsMod {
     }
 
     static function buildModSettings(parentProperties:Dynamic, mod:Dynamic):Void {
-        createText(parentProperties, Std.string(Reflect.field(mod, "name")), "selectedModTitle");
         var definitions:Array<Dynamic> = cast Reflect.field(mod, "definitions");
         for (index in 0...definitions.length) {
             var definition = definitions[index];
@@ -302,14 +301,7 @@ class BetterModSettingsMod {
             if (key.length == 0)
                 continue;
 
-            var rowProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "flow",
-                parentProperties,
-                [],
-                { id: "settingRow" + index, layout: "vertical" }
-            ]);
-            var settingParent = rowProperties == null ? parentProperties : rowProperties;
-            styleFlow(rowProperties, 0, 6, 0);
+            var settingParent = createOptionRow(parentProperties, label, index);
 
             if (type == "checkbox") {
                 var checked = boolValue(Reflect.field(mod, "values"), key, false);
@@ -331,7 +323,6 @@ class BetterModSettingsMod {
                     });
                 }
             } else if (type == "slider") {
-                createText(settingParent, label, "settingLabel" + index);
                 var min = numberField(definition, "min", 0.0);
                 var max = numberField(definition, "max", 100.0);
                 var step = numberField(definition, "step", 1.0);
@@ -372,6 +363,37 @@ class BetterModSettingsMod {
                     }]);
                 }
             }
+        }
+    }
+
+    static function createOptionRow(
+        parentProperties:Dynamic,
+        label:String,
+        index:Int
+    ):Dynamic {
+        try {
+            var optionInfo:Dynamic = {
+                id: "BetterModSettings" + index,
+                name: label,
+                props: { hideRelease: false }
+            };
+            var lineProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+                "option-line",
+                parentProperties,
+                [optionInfo],
+                { id: "settingRow" + index }
+            ]);
+            if (lineProperties == null)
+                return parentProperties;
+            var line:Dynamic = HlxRuntime.resolveField(lineProperties, "obj");
+            var container:Dynamic = line == null ? null : HlxRuntime.resolveField(line, "container");
+            var containerProperties:Dynamic = container == null
+                ? null
+                : HlxRuntime.resolveField(container, "dom");
+            return containerProperties == null ? parentProperties : containerProperties;
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not create native option row: " + Std.string(error));
+            return parentProperties;
         }
     }
 
@@ -420,7 +442,7 @@ class BetterModSettingsMod {
         if (buttonType == null)
             buttonType = HlxRuntime.resolveType("ui.comp.Button");
         if (buttonType != null && setButtonTextMember == null)
-            setButtonTextMember = HlxRuntime.resolveMember(buttonType, "set_text");
+            setButtonTextMember = HlxRuntime.resolveMember(buttonType, "setText");
         if (setButtonTextMember != null)
             HlxRuntime.callResolved(setButtonTextMember, [button, text]);
     }
