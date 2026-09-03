@@ -6,18 +6,14 @@ import imgui.ImGui;
 class BetterModSettingsMod {
     static var activeEscapeMenu:Dynamic;
     static var modSettingsButton:Dynamic;
-    static var reorderPending:Bool = false;
     static var nativeSettingsWindow:Dynamic;
 
     static var propertiesType:hl.Bytes;
     static var uiElementType:hl.Bytes;
-    static var h2dObjectType:hl.Bytes;
     static var titleWindowType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
     static var setOnClickMember:hlx.runtime.ResolvedMember;
-    static var getChildIndexMember:hlx.runtime.ResolvedMember;
-    static var addChildAtMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {
         ImGui.register(HlxRuntime.moduleName(), draw);
@@ -27,7 +23,6 @@ class BetterModSettingsMod {
     static function afterEscapeMenuInit(instance:Dynamic, result:Void):Void {
         activeEscapeMenu = instance;
         modSettingsButton = null;
-        reorderPending = false;
         trace("[BetterModSettings] Escape menu init detected");
 
         try {
@@ -72,7 +67,6 @@ class BetterModSettingsMod {
             }
 
             HlxRuntime.callResolved(setOnClickMember, [modSettingsButton, openSettings]);
-            reorderPending = true;
             trace("[BetterModSettings] Mod Settings button appended successfully");
         } catch (error:Dynamic) {
             modSettingsButton = null;
@@ -138,51 +132,14 @@ class BetterModSettingsMod {
         }
     }
 
-    static function draw():Void {
-        if (!reorderPending)
-            return;
-        reorderPending = false;
-
-        try {
-            if (modSettingsButton == null || !resolveUiMembers())
-                return;
-            var buttonProperties:Dynamic = HlxRuntime.resolveField(modSettingsButton, "dom");
-            var menuListProperties:Dynamic = buttonProperties == null
-                ? null
-                : HlxRuntime.callResolved(getParentPropertiesMember, [buttonProperties]);
-            var menuList:Dynamic = menuListProperties == null
-                ? null
-                : HlxRuntime.resolveField(menuListProperties, "obj");
-            var optionsButton:Dynamic = activeEscapeMenu == null
-                ? null
-                : HlxRuntime.resolveField(activeEscapeMenu, "optionsBtn");
-            if (menuList == null || optionsButton == null)
-                return;
-
-            var optionsIndex:Dynamic = HlxRuntime.callResolved(
-                getChildIndexMember,
-                [menuList, optionsButton]
-            );
-            if (optionsIndex != null && cast optionsIndex >= 0) {
-                HlxRuntime.callResolved(
-                    addChildAtMember,
-                    [menuList, modSettingsButton, cast optionsIndex + 1]
-                );
-                trace("[BetterModSettings] Mod Settings button moved below Options");
-            }
-        } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not reorder Escape menu button: " + Std.string(error));
-        }
-    }
+    static function draw():Void {}
 
     static function resolveUiMembers():Bool {
         if (propertiesType == null)
             propertiesType = HlxRuntime.resolveType("domkit.Properties");
         if (uiElementType == null)
             uiElementType = HlxRuntime.resolveType("ui.UIElement");
-        if (h2dObjectType == null)
-            h2dObjectType = HlxRuntime.resolveType("h2d.Object");
-        if (propertiesType == null || uiElementType == null || h2dObjectType == null)
+        if (propertiesType == null || uiElementType == null)
             return false;
 
         if (createNewMember == null)
@@ -191,14 +148,8 @@ class BetterModSettingsMod {
             getParentPropertiesMember = HlxRuntime.resolveMember(propertiesType, "get_parent");
         if (setOnClickMember == null)
             setOnClickMember = HlxRuntime.resolveMember(uiElementType, "set_onClick");
-        if (getChildIndexMember == null)
-            getChildIndexMember = HlxRuntime.resolveMember(h2dObjectType, "getChildIndex");
-        if (addChildAtMember == null)
-            addChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "addChildAt");
         return createNewMember != null
             && getParentPropertiesMember != null
-            && setOnClickMember != null
-            && getChildIndexMember != null
-            && addChildAtMember != null;
+            && setOnClickMember != null;
     }
 }
