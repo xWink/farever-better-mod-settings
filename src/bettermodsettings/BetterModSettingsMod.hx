@@ -175,7 +175,7 @@ class BetterModSettingsMod {
 
             for (folder in FileSystem.readDirectory(modsPath)) {
                 var folderPath = modsPath + "/" + folder;
-                var formatPath = folderPath + "/settingFormats.json";
+                var formatPath = folderPath + "/configFormats.json";
                 if (!FileSystem.isDirectory(folderPath)
                     || !FileSystem.exists(formatPath))
                     continue;
@@ -195,7 +195,6 @@ class BetterModSettingsMod {
                     if (definitions == null)
                         continue;
                     compatibleMods.push({
-                        id: stringField(format, "modId", folder),
                         name: stringField(format, "displayName", folder),
                         settingsPath: settingsPath,
                         definitions: definitions,
