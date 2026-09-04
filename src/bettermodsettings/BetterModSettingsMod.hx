@@ -14,7 +14,6 @@ class BetterModSettingsMod {
     static var nativeOptionLabelStyle:Dynamic;
     static var pendingOptionLabels:Array<Dynamic> = [];
     static var pendingOptionRows:Array<Dynamic> = [];
-    static var pendingSliders:Array<Dynamic> = [];
     static var labelStyleFramesRemaining:Int = 0;
 
     static var propertiesType:hl.Bytes;
@@ -24,7 +23,6 @@ class BetterModSettingsMod {
     static var baseUIType:hl.Bytes;
     static var flowType:hl.Bytes;
     static var flowAlignType:hl.Bytes;
-    static var h2dAlignType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
@@ -54,7 +52,6 @@ class BetterModSettingsMod {
     static var getNumChildrenMember:hlx.runtime.ResolvedMember;
     static var setFontMember:hlx.runtime.ResolvedMember;
     static var setTextColorMember:hlx.runtime.ResolvedMember;
-    static var setTextAlignMember:hlx.runtime.ResolvedMember;
     static var getFlowPropertiesMember:hlx.runtime.ResolvedMember;
     static var displayWindowMember:hlx.runtime.ResolvedMember;
 
@@ -141,12 +138,18 @@ class BetterModSettingsMod {
                 return;
             }
 
-            // OptionsWindow and EscapeMenu use the same coexistence flags. A
-            // bare TitleWindow does not, so copy them before BaseUI evaluates
-            // which existing windows may remain open.
+            // BaseWindow.closeOtherOnOpen treats a bare TitleWindow as the
+            // EscapeMenu's own window family. Preserve the menu's normal flags,
+            // then opt this detached companion window out of closing others.
             var windowFlags:Dynamic = HlxRuntime.resolveField(activeEscapeMenu, "windowFlags");
-            if (windowFlags != null)
-                HlxRuntime.setField(nativeSettingsWindow, "windowFlags", windowFlags);
+            if (windowFlags != null) {
+                var companionFlags:Int = cast windowFlags;
+                HlxRuntime.setField(
+                    nativeSettingsWindow,
+                    "windowFlags",
+                    companionFlags | 8192
+                );
+            }
 
             var windowProperties:Dynamic = HlxRuntime.resolveField(nativeSettingsWindow, "dom");
             if (windowProperties == null) {
@@ -157,7 +160,6 @@ class BetterModSettingsMod {
             setNativeWindowTitle(windowProperties);
             pendingOptionLabels = [];
             pendingOptionRows = [];
-            pendingSliders = [];
             labelStyleFramesRemaining = 0;
 
             var contentAttributes:Dynamic = {
@@ -575,10 +577,13 @@ class BetterModSettingsMod {
                 var slider:Dynamic = sliderProperties == null
                     ? null
                     : HlxRuntime.resolveField(sliderProperties, "obj");
-                prepareSettingControl(settingParent, sliderProperties, false);
+                // The native slider reserves a value column after its right
+                // arrow. Shift the complete control by that column's width so
+                // the arrow shares the checkbox/keybinding alignment guide.
+                // Flow's child offset is visual only and does not affect the
+                // fixed window measurement or the slider's internal spacing.
+                prepareSettingControl(settingParent, sliderProperties, false, 52);
                 if (slider != null) {
-                    pendingSliders.push(slider);
-                    alignSliderValueText(slider);
                     var targetMod = mod;
                     var targetKey = key;
                     HlxRuntime.setField(slider, "onChange", function(newValue:Float):Void {
@@ -710,15 +715,12 @@ class BetterModSettingsMod {
     static function refreshPendingOptionLabelStyles():Void {
         if (labelStyleFramesRemaining <= 0
             || (pendingOptionLabels.length == 0
-                && pendingOptionRows.length == 0
-                && pendingSliders.length == 0))
+                && pendingOptionRows.length == 0))
             return;
         labelStyleFramesRemaining--;
         try {
             for (line in pendingOptionRows)
                 centerOptionRowLabelAndSeparator(line);
-            for (slider in pendingSliders)
-                alignSliderValueText(slider);
 
             if (nativeOptionLabelStyle != null && pendingOptionLabels.length > 0) {
                 if (textType == null)
@@ -755,7 +757,6 @@ class BetterModSettingsMod {
         if (labelStyleFramesRemaining <= 0) {
             pendingOptionLabels = [];
             pendingOptionRows = [];
-            pendingSliders = [];
         }
     }
 
@@ -986,37 +987,11 @@ class BetterModSettingsMod {
         }
     }
 
-    static function alignSliderValueText(slider:Dynamic):Void {
-        if (slider == null)
-            return;
-        try {
-            var valueText:Dynamic = HlxRuntime.resolveField(slider, "valueTxt");
-            if (valueText == null)
-                return;
-            if (textType == null)
-                textType = HlxRuntime.resolveType("h2d.Text");
-            if (h2dAlignType == null)
-                h2dAlignType = HlxRuntime.resolveType("h2d.Align");
-            if (textType != null && setTextAlignMember == null)
-                setTextAlignMember = HlxRuntime.resolveMember(textType, "set_textAlign");
-            if (h2dAlignType == null || setTextAlignMember == null)
-                return;
-
-            // Slider reserves a fixed-width value column. Right alignment uses
-            // that existing space and places its visible edge on the same guide
-            // as checkboxes and keybinding buttons.
-            var right:Dynamic = HlxRuntime.constructEnum(h2dAlignType, "Right", []);
-            if (right != null)
-                HlxRuntime.callResolved(setTextAlignMember, [valueText, right]);
-        } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not align slider value: " + Std.string(error));
-        }
-    }
-
     static function prepareSettingControl(
         parentProperties:Dynamic,
         controlProperties:Dynamic,
-        removeBackground:Bool
+        removeBackground:Bool,
+        horizontalOffset:Int = 0
     ):Void {
         if (parentProperties == null || controlProperties == null)
             return;
@@ -1042,11 +1017,16 @@ class BetterModSettingsMod {
                         getFlowPropertiesMember,
                         [parent, control]
                     );
-                    if (flowProperties != null)
+                    if (flowProperties != null) {
                         HlxRuntime.setField(flowProperties, "verticalAlign", middle);
+                        if (horizontalOffset != 0)
+                            HlxRuntime.setField(flowProperties, "offsetX", horizontalOffset);
+                    }
                 }
                 applyInlineStyle(controlProperties, "valign", middle);
             }
+            if (horizontalOffset != 0)
+                applyInlineStyle(controlProperties, "offset-x", horizontalOffset);
 
             if (removeBackground) {
                 applyInlineStyle(controlProperties, "background-alpha", 0.0);
