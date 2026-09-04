@@ -564,8 +564,13 @@ class BetterModSettingsMod {
             var nativeContainerProperties:Dynamic = nativeContainer == null
                 ? null
                 : HlxRuntime.resolveField(nativeContainer, "dom");
-            if (nativeContainerProperties != null)
+            if (nativeContainerProperties != null) {
+                // The native component defaults to the stock Options viewport
+                // height, which leaves unused space in our taller fixed window.
+                // Match the scroll viewport to the 520 px body height.
+                setFixedFlowHeight(nativeContainerProperties, 520);
                 return nativeContainerProperties;
+            }
             var optionsListProperties:Dynamic = HlxRuntime.resolveField(optionsList, "dom");
             return optionsListProperties == null ? bodyProperties : optionsListProperties;
         } catch (error:Dynamic) {
