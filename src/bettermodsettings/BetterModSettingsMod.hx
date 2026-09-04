@@ -12,6 +12,8 @@ class BetterModSettingsMod {
     static var compatibleMods:Array<Dynamic> = [];
     static var capturingKeybind:Dynamic;
     static var nativeOptionLabelStyle:Dynamic;
+    static var pendingOptionLabels:Array<Dynamic> = [];
+    static var labelStyleFramesRemaining:Int = 0;
 
     static var propertiesType:hl.Bytes;
     static var uiElementType:hl.Bytes;
@@ -53,6 +55,7 @@ class BetterModSettingsMod {
     @:hlx.postfix(GameApp.update)
     static function afterGameAppUpdate(instance:Dynamic, dt:Float, result:Void):Void {
         capturePressedKey();
+        refreshPendingOptionLabelStyles();
     }
 
     @:hlx.postfix(ui.win.EscapeMenu.init)
@@ -145,6 +148,8 @@ class BetterModSettingsMod {
             }
 
             setNativeWindowTitle(windowProperties);
+            pendingOptionLabels = [];
+            labelStyleFramesRemaining = 0;
 
             var contentAttributes:Dynamic = {
                 id: "betterModSettingsContent",
@@ -179,18 +184,10 @@ class BetterModSettingsMod {
                 return;
             if (h2dObjectType == null)
                 h2dObjectType = HlxRuntime.resolveType("h2d.Object");
-            if (h2dObjectType != null && getObjectByNameMember == null)
-                getObjectByNameMember = HlxRuntime.resolveMember(h2dObjectType, "getObjectByName");
-            if (getObjectByNameMember == null)
-                return;
-
-            // TitleWindow created this node from the valid "Options"
-            // localization key. Change only its displayed text; its native
-            // parent, alignment, font and title-bar position remain untouched.
-            var titleObject:Dynamic = HlxRuntime.callResolved(
-                getObjectByNameMember,
-                [windowObject, "title"]
-            );
+            // DOMKit IDs are not h2d.Object names, so getObjectByName("title")
+            // cannot find this node. Find the native title by the localized text
+            // that TitleWindow just rendered.
+            var titleObject:Dynamic = findTextObjectByValue(windowObject, "Options", 6);
             if (titleObject == null)
                 return;
             if (textType == null)
@@ -598,6 +595,39 @@ class BetterModSettingsMod {
         return null;
     }
 
+    static function findTextObjectByValue(
+        root:Dynamic,
+        expected:String,
+        depth:Int
+    ):Dynamic {
+        if (root == null || depth < 0)
+            return null;
+        try {
+            var value:Dynamic = HlxRuntime.resolveField(root, "text");
+            if (value != null && Std.string(value) == expected)
+                return root;
+        } catch (_:Dynamic) {}
+
+        try {
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && getChildAtMember == null)
+                getChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "getChildAt");
+            if (h2dObjectType != null && getNumChildrenMember == null)
+                getNumChildrenMember = HlxRuntime.resolveMember(h2dObjectType, "get_numChildren");
+            if (getChildAtMember == null || getNumChildrenMember == null)
+                return null;
+            var count:Int = cast HlxRuntime.callResolved(getNumChildrenMember, [root]);
+            for (index in 0...count) {
+                var child:Dynamic = HlxRuntime.callResolved(getChildAtMember, [root, index]);
+                var found = findTextObjectByValue(child, expected, depth - 1);
+                if (found != null)
+                    return found;
+            }
+        } catch (_:Dynamic) {}
+        return null;
+    }
+
     static function applyNativeOptionLabelStyle(line:Dynamic):Void {
         if (line == null || nativeOptionLabelStyle == null)
             return;
@@ -605,6 +635,8 @@ class BetterModSettingsMod {
             var label = findFirstTextObject(line, 4);
             if (label == null)
                 return;
+            pendingOptionLabels.push(label);
+            labelStyleFramesRemaining = 4;
             if (textType == null)
                 textType = HlxRuntime.resolveType("h2d.Text");
             if (textType == null)
@@ -631,6 +663,46 @@ class BetterModSettingsMod {
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not apply native option label style: " + Std.string(error));
         }
+    }
+
+    static function refreshPendingOptionLabelStyles():Void {
+        if (labelStyleFramesRemaining <= 0 || pendingOptionLabels.length == 0
+            || nativeOptionLabelStyle == null)
+            return;
+        labelStyleFramesRemaining--;
+        try {
+            if (textType == null)
+                textType = HlxRuntime.resolveType("h2d.Text");
+            if (textType == null)
+                return;
+            if (setFontMember == null)
+                setFontMember = HlxRuntime.resolveMember(textType, "set_font");
+            if (setTextColorMember == null)
+                setTextColorMember = HlxRuntime.resolveMember(textType, "set_textColor");
+
+            var font:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "font");
+            var color:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "textColor");
+            for (label in pendingOptionLabels) {
+                if (label == null)
+                    continue;
+                if (font != null && setFontMember != null)
+                    HlxRuntime.callResolved(setFontMember, [label, font]);
+                if (color != null && setTextColorMember != null)
+                    HlxRuntime.callResolved(setTextColorMember, [label, color]);
+                for (field in ["scaleX", "scaleY", "letterSpacing", "lineSpacing"]) {
+                    try {
+                        var value:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, field);
+                        if (value != null)
+                            HlxRuntime.setField(label, field, value);
+                    } catch (_:Dynamic) {}
+                }
+            }
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not refresh native option label styles: " + Std.string(error));
+            labelStyleFramesRemaining = 0;
+        }
+        if (labelStyleFramesRemaining <= 0)
+            pendingOptionLabels = [];
     }
 
     static function createOptionRow(
