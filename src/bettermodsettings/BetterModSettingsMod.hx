@@ -438,7 +438,6 @@ class BetterModSettingsMod {
         }
 
         var tabsAttributes:Dynamic = { id: "modTabs" };
-        Reflect.setField(tabsAttributes, "class", "two-buttons");
         var tabs:Dynamic = HlxRuntime.callResolved(createNewMember, [
             "flow", contentProperties, [], tabsAttributes
         ]);
