@@ -37,6 +37,7 @@ class BetterModSettingsMod {
     static var flowType:hl.Bytes;
     static var flowAlignType:hl.Bytes;
     static var flowOverflowType:hl.Bytes;
+    static var flowPropertiesType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
@@ -59,6 +60,7 @@ class BetterModSettingsMod {
     static var setMultilineMember:hlx.runtime.ResolvedMember;
     static var setFillWidthMember:hlx.runtime.ResolvedMember;
     static var setNeedReflowMember:hlx.runtime.ResolvedMember;
+    static var setFlowPropertyAbsoluteMember:hlx.runtime.ResolvedMember;
     static var setSelectedMember:hlx.runtime.ResolvedMember;
     static var setButtonTextMember:hlx.runtime.ResolvedMember;
     static var setTitleTextMember:hlx.runtime.ResolvedMember;
@@ -1219,6 +1221,7 @@ class BetterModSettingsMod {
                 viewportWidth = 120;
 
             setFixedFlowWidth(viewportProperties, viewportWidth);
+            setFixedFlowHeight(viewportProperties, 50);
             setFlowHorizontalSpacing(viewportProperties, tabGap);
             prepareSettingControl(parentProperties, viewportProperties, false);
 
@@ -1310,6 +1313,35 @@ class BetterModSettingsMod {
         }
     }
 
+    static function setFixedFlowHeight(properties:Dynamic, height:Int):Void {
+        if (properties == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType == null)
+                return;
+            if (setMinHeightMember == null)
+                setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
+            if (setMaxHeightMember == null)
+                setMaxHeightMember = HlxRuntime.resolveMember(flowType, "set_maxHeight");
+
+            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            if (flow == null)
+                return;
+            if (setMinHeightMember != null)
+                HlxRuntime.callResolved(setMinHeightMember, [flow, height]);
+            if (setMaxHeightMember != null)
+                HlxRuntime.callResolved(setMaxHeightMember, [flow, height]);
+
+            applyInlineStyle(properties, "height", height);
+            applyInlineStyle(properties, "min-height", height);
+            applyInlineStyle(properties, "max-height", height);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not set fixed tab viewport height: " + Std.string(error));
+        }
+    }
+
     static function buildTabPages(
         tabWidths:Array<Int>,
         spacing:Int,
@@ -1346,6 +1378,7 @@ class BetterModSettingsMod {
         headerProperties:Dynamic,
         viewportProperties:Dynamic,
         tabButtons:Array<Dynamic>,
+        tabWidths:Array<Int>,
         pages:Array<Array<Int>>,
         pageIndex:Int
     ):Void {
@@ -1365,6 +1398,7 @@ class BetterModSettingsMod {
             setFlowHorizontalSpacing(headerProperties, 10);
             setFlowHorizontalSpacing(viewportProperties, 20);
             setFixedFlowWidth(viewportProperties, 886);
+            setFixedFlowHeight(viewportProperties, 50);
             if (flowType == null)
                 flowType = HlxRuntime.resolveType("h2d.Flow");
             if (flowAlignType == null)
@@ -1390,7 +1424,17 @@ class BetterModSettingsMod {
             if (left != null)
                 applyInlineStyle(viewportProperties, "halign", left);
 
+            if (flowPropertiesType == null)
+                flowPropertiesType = HlxRuntime.resolveType("h2d.FlowProperties");
+            if (flowPropertiesType != null
+                && setFlowPropertyAbsoluteMember == null)
+                setFlowPropertyAbsoluteMember = HlxRuntime.resolveMember(
+                    flowPropertiesType,
+                    "set_isAbsolute"
+                );
+
             var page = pages[pageIndex];
+            var tabX = 0;
             for (index in 0...tabButtons.length) {
                 var button = tabButtons[index];
                 if (button != null) {
@@ -1411,22 +1455,34 @@ class BetterModSettingsMod {
                             [viewport, button]
                         );
                     if (tabFlowProperties != null) {
-                        HlxRuntime.setField(
-                            tabFlowProperties,
-                            "horizontalAlign",
-                            left
-                        );
+                        HlxRuntime.setField(tabFlowProperties, "horizontalAlign", null);
                         HlxRuntime.setField(tabFlowProperties, "paddingLeft", 0);
                         HlxRuntime.setField(tabFlowProperties, "paddingRight", 0);
                         HlxRuntime.setField(tabFlowProperties, "offsetX", 0);
                         HlxRuntime.setField(tabFlowProperties, "lineBreak", false);
-                        HlxRuntime.setField(tabFlowProperties, "isAbsolute", false);
                         HlxRuntime.setField(tabFlowProperties, "autoSizeWidth", null);
+                        if (setFlowPropertyAbsoluteMember != null)
+                            HlxRuntime.callResolved(
+                                setFlowPropertyAbsoluteMember,
+                                [tabFlowProperties, true]
+                            );
+                        else
+                            HlxRuntime.setField(
+                                tabFlowProperties,
+                                "isAbsolute",
+                                true
+                            );
                     }
+                    var visible = page.indexOf(index) >= 0;
                     HlxRuntime.callResolved(setVisibleMember, [
                         button,
-                        page.indexOf(index) >= 0
+                        visible
                     ]);
+                    if (visible) {
+                        HlxRuntime.setField(button, "x", tabX * 1.0);
+                        if (index < tabWidths.length)
+                            tabX += tabWidths[index] + 20;
+                    }
                 }
             }
 
@@ -1553,6 +1609,7 @@ class BetterModSettingsMod {
                         headerProperties,
                         viewportProperties,
                         tabButtons,
+                        measuredWidths,
                         pages,
                         currentPage
                     );
@@ -1568,6 +1625,7 @@ class BetterModSettingsMod {
                         headerProperties,
                         viewportProperties,
                         tabButtons,
+                        measuredWidths,
                         pages,
                         currentPage
                     );
@@ -1577,6 +1635,7 @@ class BetterModSettingsMod {
                 headerProperties,
                 viewportProperties,
                 tabButtons,
+                measuredWidths,
                 pages,
                 currentPage
             );
