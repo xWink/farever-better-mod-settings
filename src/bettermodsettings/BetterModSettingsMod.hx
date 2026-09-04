@@ -40,6 +40,8 @@ class BetterModSettingsMod {
     static var isKeyPressedMember:hlx.runtime.ResolvedMember;
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
+    static var addChildAtMember:hlx.runtime.ResolvedMember;
+    static var removeChildrenMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -176,12 +178,21 @@ class BetterModSettingsMod {
             if (windowObject == null)
                 return;
             HlxRuntime.setField(windowProperties, "contentRoot", windowObject);
-            HlxRuntime.callResolved(createNewMember, [
+            var titleProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "text",
                 windowProperties,
                 ["Mod Settings"],
                 { id: "title" }
             ]);
+            var titleObject:Dynamic = titleProperties == null
+                ? null
+                : HlxRuntime.resolveField(titleProperties, "obj");
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && addChildAtMember == null)
+                addChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "addChildAt");
+            if (titleObject != null && addChildAtMember != null)
+                HlxRuntime.callResolved(addChildAtMember, [windowObject, titleObject, 0]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not create native window title: " + Std.string(error));
         }
@@ -213,13 +224,13 @@ class BetterModSettingsMod {
             if (content == null)
                 return;
             if (setMinWidthMember != null)
-                HlxRuntime.callResolved(setMinWidthMember, [content, 900]);
+                HlxRuntime.callResolved(setMinWidthMember, [content, 970]);
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [content, 540]);
+                HlxRuntime.callResolved(setMinHeightMember, [content, 640]);
             if (setMaxWidthMember != null)
-                HlxRuntime.callResolved(setMaxWidthMember, [content, 900]);
+                HlxRuntime.callResolved(setMaxWidthMember, [content, 970]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [content, 540]);
+                HlxRuntime.callResolved(setMaxHeightMember, [content, 640]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size native window: " + Std.string(error));
         }
@@ -243,13 +254,13 @@ class BetterModSettingsMod {
             if (body == null)
                 return;
             if (setMinWidthMember != null)
-                HlxRuntime.callResolved(setMinWidthMember, [body, 900]);
+                HlxRuntime.callResolved(setMinWidthMember, [body, 970]);
             if (setMaxWidthMember != null)
-                HlxRuntime.callResolved(setMaxWidthMember, [body, 900]);
+                HlxRuntime.callResolved(setMaxWidthMember, [body, 970]);
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [body, 420]);
+                HlxRuntime.callResolved(setMinHeightMember, [body, 514]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [body, 420]);
+                HlxRuntime.callResolved(setMaxHeightMember, [body, 514]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings body: " + Std.string(error));
         }
@@ -319,20 +330,6 @@ class BetterModSettingsMod {
         styleFlow(tabs, 12, 0, 10);
         setHorizontalPadding(tabs, 64);
 
-        // This must be the native OptionsContent component, not a generic flow
-        // carrying the same CSS classes. Its component identity is what activates
-        // the game's Options body background and OptionLine typography.
-        var bodyProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-            "options-content",
-            contentProperties,
-            [0],
-            { id: "modSettingsBody" }
-        ]);
-        if (bodyProperties == null)
-            bodyProperties = contentProperties;
-        sizeBody(bodyProperties);
-        var settingsParentProperties = prepareNativeOptionsBody(bodyProperties);
-
         var panels:Array<Dynamic> = [];
         var tabButtons:Array<Dynamic> = [];
         for (index in 0...compatibleMods.length) {
@@ -352,22 +349,20 @@ class BetterModSettingsMod {
                 }]);
             }
 
-            var panelAttributes:Dynamic = {
-                id: "modPanel" + index,
-                layout: "vertical"
-            };
-
+            // Give every tab a complete native OptionsContent hierarchy. OptionLine
+            // styling is scoped to OptionsList > Block#container, so inserting an
+            // extra panel between those components changes its font and spacing.
             var panelProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "block", settingsParentProperties, [], panelAttributes
+                "options-content", contentProperties, [0], { id: "modPanel" + index }
             ]);
             var panel:Dynamic = panelProperties == null
                 ? null
                 : HlxRuntime.resolveField(panelProperties, "obj");
             panels.push(panel);
             if (panelProperties != null) {
-                styleFlow(panelProperties, 4, 14, 0);
-                setHorizontalPadding(panelProperties, 64);
-                buildModSettings(panelProperties, mod);
+                sizeBody(panelProperties);
+                var settingsParentProperties = prepareNativeOptionsBody(panelProperties);
+                buildModSettings(settingsParentProperties, mod);
             }
         }
         showPanel(panels, tabButtons, 0);
@@ -383,8 +378,7 @@ class BetterModSettingsMod {
             if (h2dObjectType != null && setVisibleMember == null)
                 setVisibleMember = HlxRuntime.resolveMember(h2dObjectType, "set_visible");
 
-            // Keep OptionsList and its Block visible: the native stylesheet targets
-            // this exact ancestry when styling the body and OptionLine labels.
+            // Keep the complete native ancestry and its `in-option-group` class.
             var inputList:Dynamic = HlxRuntime.resolveField(body, "inputList");
             if (inputList != null && setVisibleMember != null)
                 HlxRuntime.callResolved(setVisibleMember, [inputList, false]);
@@ -392,21 +386,25 @@ class BetterModSettingsMod {
             var optionsList:Dynamic = HlxRuntime.resolveField(body, "optionsList");
             if (optionsList == null)
                 return bodyProperties;
-            // HashLink keeps OptionsList.lines as ArrayObj, which cannot be
-            // safely iterated as Haxe Array<Dynamic>. Hide the generated Block
-            // wholesale and create our own native Block under the same OptionsList.
+            // Remove the rows generated for group 0, but retain the native
+            // Block#container itself: its id and ancestry activate OptionLine's
+            // native font, colour, leader, margins, and control alignment.
             var nativeContainer:Dynamic = HlxRuntime.resolveField(optionsList, "container");
-            if (nativeContainer != null && setVisibleMember != null)
-                HlxRuntime.callResolved(setVisibleMember, [nativeContainer, false]);
+            if (nativeContainer == null)
+                return bodyProperties;
+            if (removeChildrenMember == null && h2dObjectType != null)
+                removeChildrenMember = HlxRuntime.resolveMember(h2dObjectType, "removeChildren");
+            if (removeChildrenMember != null)
+                HlxRuntime.callResolved(removeChildrenMember, [nativeContainer]);
 
             var applyButton:Dynamic = HlxRuntime.resolveField(optionsList, "applyBtn");
             if (applyButton != null && setVisibleMember != null)
                 HlxRuntime.callResolved(setVisibleMember, [applyButton, false]);
 
-            var optionsListProperties:Dynamic = HlxRuntime.resolveField(optionsList, "dom");
-            return optionsListProperties == null
+            var containerProperties:Dynamic = HlxRuntime.resolveField(nativeContainer, "dom");
+            return containerProperties == null
                 ? bodyProperties
-                : optionsListProperties;
+                : containerProperties;
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not prepare native options body: " + Std.string(error));
             return bodyProperties;
