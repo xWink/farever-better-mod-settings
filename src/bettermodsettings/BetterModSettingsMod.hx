@@ -175,32 +175,14 @@ class BetterModSettingsMod {
             }
 
             applyNativeOptionsWindowComponent(windowProperties);
-            collapseUnusedNativeTabHeader(windowProperties);
             sizeNativeSettingsWindow(windowProperties);
             setNativeWindowTitle(windowProperties);
             pendingOptionLabels = [];
             pendingOptionRows = [];
             labelStyleFramesRemaining = 0;
 
-            var contentAttributes:Dynamic = {
-                id: "betterModSettingsContent",
-                layout: "vertical"
-            };
-
-            var contentProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "flow",
-                windowProperties,
-                [],
-                contentAttributes
-            ]);
-            if (contentProperties == null)
-                return;
-
-            sizeContent(contentProperties);
-            styleFlow(contentProperties, 0, 0, 0);
-            setPersistentContentLayout(contentProperties);
             discoverCompatibleMods();
-            buildSettingsContent(contentProperties);
+            buildSettingsContent(windowProperties);
             displayNativeSettingsWindow();
 
         } catch (error:Dynamic) {
@@ -256,16 +238,20 @@ class BetterModSettingsMod {
         }
     }
 
-    static function collapseUnusedNativeTabHeader(windowProperties:Dynamic):Void {
+    static function findPropertiesWithClass(
+        object:Dynamic,
+        className:String,
+        depth:Int
+    ):Dynamic {
+        if (object == null || depth < 0)
+            return null;
         try {
             if (h2dObjectType == null)
                 h2dObjectType = HlxRuntime.resolveType("h2d.Object");
-            if (flowType == null)
-                flowType = HlxRuntime.resolveType("h2d.Flow");
             if (propertiesType == null)
                 propertiesType = HlxRuntime.resolveType("domkit.Properties");
-            if (h2dObjectType == null || flowType == null || propertiesType == null)
-                return;
+            if (h2dObjectType == null || propertiesType == null)
+                return null;
 
             if (getChildAtMember == null)
                 getChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "getChildAt");
@@ -273,57 +259,35 @@ class BetterModSettingsMod {
                 getNumChildrenMember = HlxRuntime.resolveMember(h2dObjectType, "get_numChildren");
             if (hasClassMember == null)
                 hasClassMember = HlxRuntime.resolveMember(propertiesType, "hasClass");
-            if (setMinHeightMember == null)
-                setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
-            if (setMaxHeightMember == null)
-                setMaxHeightMember = HlxRuntime.resolveMember(flowType, "set_maxHeight");
-            if (setPaddingMember == null)
-                setPaddingMember = HlxRuntime.resolveMember(flowType, "set_padding");
 
-            var windowObject:Dynamic = HlxRuntime.resolveField(windowProperties, "obj");
-            if (windowObject == null || getChildAtMember == null
-                || getNumChildrenMember == null || hasClassMember == null)
-                return;
+            var objectProperties:Dynamic = HlxRuntime.resolveField(object, "dom");
+            if (objectProperties != null && hasClassMember != null) {
+                var matches:Bool = HlxRuntime.callResolved(
+                    hasClassMember,
+                    [objectProperties, className]
+                );
+                if (matches)
+                    return objectProperties;
+            }
 
-            var childCount:Int = HlxRuntime.callResolved(
-                getNumChildrenMember,
-                [windowObject]
-            );
+            if (getChildAtMember == null || getNumChildrenMember == null)
+                return null;
+            var childCount:Int = HlxRuntime.callResolved(getNumChildrenMember, [object]);
             for (index in 0...childCount) {
                 var child:Dynamic = HlxRuntime.callResolved(
                     getChildAtMember,
-                    [windowObject, index]
+                    [object, index]
                 );
-                var childProperties:Dynamic = child == null
-                    ? null
-                    : HlxRuntime.resolveField(child, "dom");
-                if (childProperties == null)
-                    continue;
-
-                var isNativeTabHeader:Bool = HlxRuntime.callResolved(
-                    hasClassMember,
-                    [childProperties, "title-window-content"]
+                var found:Dynamic = findPropertiesWithClass(
+                    child,
+                    className,
+                    depth - 1
                 );
-                if (!isNativeTabHeader)
-                    continue;
-
-                if (setMinHeightMember != null)
-                    HlxRuntime.callResolved(setMinHeightMember, [child, 0]);
-                if (setMaxHeightMember != null)
-                    HlxRuntime.callResolved(setMaxHeightMember, [child, 0]);
-                if (setPaddingMember != null)
-                    HlxRuntime.callResolved(setPaddingMember, [child, 0]);
-
-                applyInlineStyle(childProperties, "height", 0);
-                applyInlineStyle(childProperties, "min-height", 0);
-                applyInlineStyle(childProperties, "max-height", 0);
-                applyInlineStyle(childProperties, "padding-top", 0);
-                applyInlineStyle(childProperties, "padding-bottom", 0);
-                return;
+                if (found != null)
+                    return found;
             }
-        } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not collapse native tab header: " + Std.string(error));
-        }
+        } catch (_:Dynamic) {}
+        return null;
     }
 
     static function displayNativeSettingsWindow():Void {
@@ -375,37 +339,6 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(setTitleTextMember, [titleObject, "Mod Settings"]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not update native window title: " + Std.string(error));
-        }
-    }
-
-    static function sizeContent(contentProperties:Dynamic):Void {
-        try {
-            if (flowType == null)
-                flowType = HlxRuntime.resolveType("h2d.Flow");
-            if (flowType == null)
-                return;
-            if (setMinWidthMember == null)
-                setMinWidthMember = HlxRuntime.resolveMember(flowType, "set_minWidth");
-            if (setMinHeightMember == null)
-                setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
-            if (setMaxWidthMember == null)
-                setMaxWidthMember = HlxRuntime.resolveMember(flowType, "set_maxWidth");
-            if (setMaxHeightMember == null)
-                setMaxHeightMember = HlxRuntime.resolveMember(flowType, "set_maxHeight");
-
-            var content:Dynamic = HlxRuntime.resolveField(contentProperties, "obj");
-            if (content == null)
-                return;
-            if (setMinWidthMember != null)
-                HlxRuntime.callResolved(setMinWidthMember, [content, 970]);
-            if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [content, 540]);
-            if (setMaxWidthMember != null)
-                HlxRuntime.callResolved(setMaxWidthMember, [content, 970]);
-            if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [content, 540]);
-        } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not size native window: " + Std.string(error));
         }
     }
 
@@ -503,32 +436,42 @@ class BetterModSettingsMod {
         }
     }
 
-    static function buildSettingsContent(contentProperties:Dynamic):Void {
+    static function buildSettingsContent(windowProperties:Dynamic):Void {
         if (compatibleMods.length == 0) {
-            createText(contentProperties, "No compatible mods were found.", "noCompatibleMods");
+            createText(windowProperties, "No compatible mods were found.", "noCompatibleMods");
+            return;
+        }
+
+        var windowObject:Dynamic = HlxRuntime.resolveField(windowProperties, "obj");
+        var nativeHeaderProperties:Dynamic = findPropertiesWithClass(
+            windowObject,
+            "title-window-content",
+            3
+        );
+        if (nativeHeaderProperties == null) {
+            trace("[BetterModSettings] Native tab header was not found");
             return;
         }
 
         var tabsAttributes:Dynamic = { id: "modTabs" };
-        Reflect.setField(tabsAttributes, "class", "two-buttons");
+        Reflect.setField(tabsAttributes, "class", "tabs");
         var tabs:Dynamic = HlxRuntime.callResolved(createNewMember, [
-            "flow", contentProperties, [], tabsAttributes
+            "element", nativeHeaderProperties, [], tabsAttributes
         ]);
-        styleFlow(tabs, 0, 0, 10);
-        setHorizontalPadding(tabs, 64);
-        setPersistentTabsLayout(tabs);
+        if (tabs == null)
+            return;
 
         // This must be the native OptionsContent component, not a generic flow
         // carrying the same CSS classes. Its component identity is what activates
         // the game's Options body background and OptionLine typography.
         var bodyProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
             "options-content",
-            contentProperties,
+            windowProperties,
             [0],
             { id: "modSettingsBody" }
         ]);
         if (bodyProperties == null)
-            bodyProperties = contentProperties;
+            bodyProperties = windowProperties;
         sizeBody(bodyProperties);
         var settingsParentProperties = prepareNativeOptionsBody(bodyProperties);
 
@@ -1108,50 +1051,6 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(setPaddingRightMember, [flow, padding]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not inset settings panel: " + Std.string(error));
-        }
-    }
-
-    static function setPersistentContentLayout(properties:Dynamic):Void {
-        if (properties == null)
-            return;
-        try {
-            applyInlineStyle(properties, "padding-top", 0);
-            applyInlineStyle(properties, "padding-bottom", 0);
-            applyInlineStyle(properties, "vspacing", 0);
-        } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not size window content: " + Std.string(error));
-        }
-    }
-
-    static function setPersistentTabsLayout(properties:Dynamic):Void {
-        if (properties == null)
-            return;
-        try {
-            if (flowType == null)
-                flowType = HlxRuntime.resolveType("h2d.Flow");
-            if (flowType != null && setMinHeightMember == null)
-                setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
-            if (flowType != null && setMaxHeightMember == null)
-                setMaxHeightMember = HlxRuntime.resolveMember(flowType, "set_maxHeight");
-
-            var tabs:Dynamic = HlxRuntime.resolveField(properties, "obj");
-            if (tabs != null) {
-                if (setMinHeightMember != null)
-                    HlxRuntime.callResolved(setMinHeightMember, [tabs, 70]);
-                if (setMaxHeightMember != null)
-                    HlxRuntime.callResolved(setMaxHeightMember, [tabs, 70]);
-            }
-
-            applyInlineStyle(properties, "height", 70);
-            applyInlineStyle(properties, "min-height", 70);
-            applyInlineStyle(properties, "max-height", 70);
-            applyInlineStyle(properties, "padding-left", 64);
-            applyInlineStyle(properties, "padding-right", 64);
-            applyInlineStyle(properties, "padding-top", 10);
-            applyInlineStyle(properties, "padding-bottom", 10);
-            applyInlineStyle(properties, "hspacing", 10);
-        } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not size tab header: " + Std.string(error));
         }
     }
 
