@@ -47,6 +47,7 @@ class BetterModSettingsMod {
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
     static var hxdKeyType:hl.Bytes;
+    static var arrayObjType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getComponentMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
@@ -79,7 +80,8 @@ class BetterModSettingsMod {
     static var getChildIndexMember:hlx.runtime.ResolvedMember;
     static var getNumChildrenMember:hlx.runtime.ResolvedMember;
     static var addChildMember:hlx.runtime.ResolvedMember;
-    static var addChildAtMember:hlx.runtime.ResolvedMember;
+    static var arrayRemoveMember:hlx.runtime.ResolvedMember;
+    static var arrayInsertMember:hlx.runtime.ResolvedMember;
     static var setFontMember:hlx.runtime.ResolvedMember;
     static var setTextColorMember:hlx.runtime.ResolvedMember;
     static var setTextMaxWidthMember:hlx.runtime.ResolvedMember;
@@ -187,12 +189,14 @@ class BetterModSettingsMod {
                 h2dObjectType,
                 "getChildIndex"
             );
-        if (addChildAtMember == null)
-            addChildAtMember = HlxRuntime.resolveMember(
-                h2dObjectType,
-                "addChildAt"
-            );
-        if (getChildIndexMember == null || addChildAtMember == null)
+        if (arrayObjType == null)
+            arrayObjType = HlxRuntime.resolveType("hl.types.ArrayObj");
+        if (arrayObjType != null && arrayRemoveMember == null)
+            arrayRemoveMember = HlxRuntime.resolveMember(arrayObjType, "remove");
+        if (arrayObjType != null && arrayInsertMember == null)
+            arrayInsertMember = HlxRuntime.resolveMember(arrayObjType, "insert");
+        if (getChildIndexMember == null || arrayRemoveMember == null
+            || arrayInsertMember == null)
             return;
 
         var parent:Dynamic = HlxRuntime.resolveField(parentProperties, "obj");
@@ -205,11 +209,35 @@ class BetterModSettingsMod {
         if (rawAnchorIndex == null)
             return;
         var anchorIndex:Int = cast rawAnchorIndex;
-        if (anchorIndex >= 0)
-            HlxRuntime.callResolved(
-                addChildAtMember,
-                [parent, button, anchorIndex + 1]
+        if (anchorIndex < 0)
+            return;
+
+        // addChildAt reparents the live DOMKit button, which invalidates the
+        // menu's DOM hierarchy. Reorder only the parent's child array instead:
+        // both buttons retain the same parent and DOMKit ownership.
+        var children:Dynamic = HlxRuntime.resolveField(parent, "children");
+        if (children == null)
+            return;
+        var removed:Dynamic = HlxRuntime.callResolved(
+            arrayRemoveMember,
+            [children, button]
+        );
+        if (removed != true)
+            return;
+        HlxRuntime.callResolved(
+            arrayInsertMember,
+            [children, anchorIndex + 1, button]
+        );
+
+        if (flowType == null)
+            flowType = HlxRuntime.resolveType("h2d.Flow");
+        if (flowType != null && setNeedReflowMember == null)
+            setNeedReflowMember = HlxRuntime.resolveMember(
+                flowType,
+                "set_needReflow"
             );
+        if (setNeedReflowMember != null)
+            HlxRuntime.callResolved(setNeedReflowMember, [parent, true]);
     }
 
     static function openSettings():Void {
