@@ -382,6 +382,7 @@ class BetterModSettingsMod {
             if (panelProperties != null) {
                 styleFlow(panelProperties, 4, 14, 0);
                 setHorizontalPadding(panelProperties, 100);
+                setPersistentHorizontalPadding(panelProperties, 100);
                 sizeSettingsPanel(panelProperties);
                 buildModSettings(panelProperties, mod);
             }
@@ -859,6 +860,37 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(setPaddingRightMember, [flow, padding]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not inset settings panel: " + Std.string(error));
+        }
+    }
+
+    static function setPersistentHorizontalPadding(
+        properties:Dynamic,
+        padding:Int
+    ):Void {
+        if (properties == null)
+            return;
+        try {
+            // Flow setters are overwritten when the native Options stylesheet
+            // reflows. Inline DOMKit styles take part in that cascade and keep
+            // the custom panel inset stable.
+            if (propertiesType == null)
+                propertiesType = HlxRuntime.resolveType("domkit.Properties");
+            if (propertiesType != null && initStyleMember == null)
+                initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
+            if (initStyleMember == null)
+                return;
+            HlxRuntime.callResolved(initStyleMember, [
+                properties,
+                "padding-left",
+                padding
+            ]);
+            HlxRuntime.callResolved(initStyleMember, [
+                properties,
+                "padding-right",
+                padding
+            ]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not persist settings panel inset: " + Std.string(error));
         }
     }
 
