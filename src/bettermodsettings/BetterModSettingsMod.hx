@@ -16,6 +16,7 @@ class BetterModSettingsMod {
     static var nativeOptionLabelStyle:Dynamic;
     static var pendingOptionLabels:Array<Dynamic> = [];
     static var pendingOptionRows:Array<Dynamic> = [];
+    static var pendingTabLabels:Array<Dynamic> = [];
     static var labelStyleFramesRemaining:Int = 0;
 
     static var propertiesType:hl.Bytes;
@@ -44,6 +45,8 @@ class BetterModSettingsMod {
     static var setVerticalSpacingMember:hlx.runtime.ResolvedMember;
     static var setHorizontalSpacingMember:hlx.runtime.ResolvedMember;
     static var setHorizontalAlignMember:hlx.runtime.ResolvedMember;
+    static var setMultilineMember:hlx.runtime.ResolvedMember;
+    static var setFillWidthMember:hlx.runtime.ResolvedMember;
     static var setSelectedMember:hlx.runtime.ResolvedMember;
     static var setButtonTextMember:hlx.runtime.ResolvedMember;
     static var setTitleTextMember:hlx.runtime.ResolvedMember;
@@ -57,6 +60,9 @@ class BetterModSettingsMod {
     static var getNumChildrenMember:hlx.runtime.ResolvedMember;
     static var setFontMember:hlx.runtime.ResolvedMember;
     static var setTextColorMember:hlx.runtime.ResolvedMember;
+    static var setTextMaxWidthMember:hlx.runtime.ResolvedMember;
+    static var setTextLineBreakMember:hlx.runtime.ResolvedMember;
+    static var getTextWidthMember:hlx.runtime.ResolvedMember;
     static var getFlowPropertiesMember:hlx.runtime.ResolvedMember;
     static var displayWindowMember:hlx.runtime.ResolvedMember;
 
@@ -179,6 +185,7 @@ class BetterModSettingsMod {
             setNativeWindowTitle(windowProperties);
             pendingOptionLabels = [];
             pendingOptionRows = [];
+            pendingTabLabels = [];
             labelStyleFramesRemaining = 0;
 
             discoverCompatibleMods();
@@ -312,9 +319,9 @@ class BetterModSettingsMod {
             if (setMaxWidthMember != null)
                 HlxRuntime.callResolved(setMaxWidthMember, [body, 990]);
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [body, 500]);
+                HlxRuntime.callResolved(setMinHeightMember, [body, 520]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [body, 500]);
+                HlxRuntime.callResolved(setMaxHeightMember, [body, 520]);
 
             // Flow dimensions are later overwritten by DOMKit's component CSS.
             // Inline styles participate in that same cascade and survive reflow.
@@ -326,9 +333,9 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(initStyleMember, [bodyProperties, "width", 990]);
                 HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-width", 990]);
                 HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-width", 990]);
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "height", 500]);
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-height", 500]);
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "height", 520]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-height", 520]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-height", 520]);
             }
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings body: " + Std.string(error));
@@ -413,6 +420,7 @@ class BetterModSettingsMod {
         if (tabs == null)
             return;
         increaseHorizontalSpacing(tabs, 20);
+        prepareTabSizing(tabs);
 
         // This must be the native OptionsContent component, not a generic flow
         // carrying the same CSS classes. Its component identity is what activates
@@ -432,10 +440,11 @@ class BetterModSettingsMod {
         var tabButtons:Array<Dynamic> = [];
         for (index in 0...compatibleMods.length) {
             var mod:Dynamic = compatibleMods[index];
+            var modName = Std.string(Reflect.field(mod, "name"));
             var tab:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "button",
                 tabs,
-                [Std.string(Reflect.field(mod, "name"))],
+                [modName],
                 { id: "modTab" + index }
             ]);
             var tabButton:Dynamic = tab == null ? null : HlxRuntime.resolveField(tab, "obj");
@@ -443,6 +452,7 @@ class BetterModSettingsMod {
             if (tabButton != null) {
                 prepareSettingControl(tabs, tab, false);
                 centerFlowContents(tab);
+                prepareSingleLineTab(tab, modName);
                 var selectedIndex = index;
                 HlxRuntime.callResolved(setOnClickMember, [tabButton, function():Void {
                     showPanel(panels, tabButtons, selectedIndex);
@@ -486,18 +496,18 @@ class BetterModSettingsMod {
             if (panel == null)
                 return;
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [panel, 500]);
+                HlxRuntime.callResolved(setMinHeightMember, [panel, 520]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [panel, 500]);
+                HlxRuntime.callResolved(setMaxHeightMember, [panel, 520]);
 
             if (propertiesType == null)
                 propertiesType = HlxRuntime.resolveType("domkit.Properties");
             if (propertiesType != null && initStyleMember == null)
                 initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
             if (initStyleMember != null) {
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "height", 500]);
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "min-height", 500]);
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "max-height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "height", 520]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "min-height", 520]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "max-height", 520]);
             }
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings panel: " + Std.string(error));
@@ -755,12 +765,30 @@ class BetterModSettingsMod {
     static function refreshPendingOptionLabelStyles():Void {
         if (labelStyleFramesRemaining <= 0
             || (pendingOptionLabels.length == 0
-                && pendingOptionRows.length == 0))
+                && pendingOptionRows.length == 0
+                && pendingTabLabels.length == 0))
             return;
         labelStyleFramesRemaining--;
         try {
             for (line in pendingOptionRows)
                 centerOptionRowLabelAndSeparator(line);
+
+            if (pendingTabLabels.length > 0) {
+                if (textType == null)
+                    textType = HlxRuntime.resolveType("h2d.Text");
+                if (textType != null && setTextMaxWidthMember == null)
+                    setTextMaxWidthMember = HlxRuntime.resolveMember(textType, "set_maxWidth");
+                if (textType != null && setTextLineBreakMember == null)
+                    setTextLineBreakMember = HlxRuntime.resolveMember(textType, "set_lineBreak");
+                for (tabLabel in pendingTabLabels) {
+                    if (tabLabel == null)
+                        continue;
+                    if (setTextMaxWidthMember != null)
+                        HlxRuntime.callResolved(setTextMaxWidthMember, [tabLabel, null]);
+                    if (setTextLineBreakMember != null)
+                        HlxRuntime.callResolved(setTextLineBreakMember, [tabLabel, false]);
+                }
+            }
 
             if (nativeOptionLabelStyle != null && pendingOptionLabels.length > 0) {
                 if (textType == null)
@@ -797,6 +825,7 @@ class BetterModSettingsMod {
         if (labelStyleFramesRemaining <= 0) {
             pendingOptionLabels = [];
             pendingOptionRows = [];
+            pendingTabLabels = [];
         }
     }
 
@@ -966,6 +995,124 @@ class BetterModSettingsMod {
                 return Std.string(name);
         }
         return "Key " + keyCode;
+    }
+
+    static function prepareTabSizing(properties:Dynamic):Void {
+        if (properties == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowAlignType == null)
+                flowAlignType = HlxRuntime.resolveType("h2d.FlowAlign");
+            if (flowType == null)
+                return;
+
+            if (setMinWidthMember == null)
+                setMinWidthMember = HlxRuntime.resolveMember(flowType, "set_minWidth");
+            if (setMaxWidthMember == null)
+                setMaxWidthMember = HlxRuntime.resolveMember(flowType, "set_maxWidth");
+            if (setMultilineMember == null)
+                setMultilineMember = HlxRuntime.resolveMember(flowType, "set_multiline");
+            if (setHorizontalAlignMember == null)
+                setHorizontalAlignMember = HlxRuntime.resolveMember(
+                    flowType,
+                    "set_horizontalAlign"
+                );
+
+            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            if (flow == null)
+                return;
+            if (setMinWidthMember != null)
+                HlxRuntime.callResolved(setMinWidthMember, [flow, 990]);
+            if (setMaxWidthMember != null)
+                HlxRuntime.callResolved(setMaxWidthMember, [flow, 990]);
+            if (setMultilineMember != null)
+                HlxRuntime.callResolved(setMultilineMember, [flow, false]);
+
+            var left:Dynamic = flowAlignType == null
+                ? null
+                : HlxRuntime.constructEnum(flowAlignType, "Left", []);
+            if (left != null && setHorizontalAlignMember != null)
+                HlxRuntime.callResolved(setHorizontalAlignMember, [flow, left]);
+
+            setHorizontalPadding(properties, 10);
+            applyInlineStyle(properties, "width", 990);
+            applyInlineStyle(properties, "min-width", 990);
+            applyInlineStyle(properties, "max-width", 990);
+            applyInlineStyle(properties, "padding-left", 10);
+            applyInlineStyle(properties, "padding-right", 10);
+            applyInlineStyle(properties, "multiline", false);
+            if (left != null)
+                applyInlineStyle(properties, "halign", left);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not prepare tab sizing: " + Std.string(error));
+        }
+    }
+
+    static function prepareSingleLineTab(
+        properties:Dynamic,
+        labelText:String
+    ):Void {
+        if (properties == null)
+            return;
+        try {
+            var button:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            if (button == null)
+                return;
+            var label:Dynamic = findFirstTextObject(button, 4);
+            if (textType == null)
+                textType = HlxRuntime.resolveType("h2d.Text");
+            if (textType != null && setTextMaxWidthMember == null)
+                setTextMaxWidthMember = HlxRuntime.resolveMember(textType, "set_maxWidth");
+            if (textType != null && setTextLineBreakMember == null)
+                setTextLineBreakMember = HlxRuntime.resolveMember(textType, "set_lineBreak");
+            if (textType != null && getTextWidthMember == null)
+                getTextWidthMember = HlxRuntime.resolveMember(textType, "get_textWidth");
+            if (label != null) {
+                pendingTabLabels.push(label);
+                labelStyleFramesRemaining = 4;
+                if (setTextMaxWidthMember != null)
+                    HlxRuntime.callResolved(setTextMaxWidthMember, [label, null]);
+                if (setTextLineBreakMember != null)
+                    HlxRuntime.callResolved(setTextLineBreakMember, [label, false]);
+            }
+
+            var measuredWidth:Float = 0.0;
+            if (label != null && getTextWidthMember != null) {
+                var measured:Dynamic = HlxRuntime.callResolved(getTextWidthMember, [label]);
+                if (measured != null)
+                    measuredWidth = cast measured;
+            }
+            var rawTextWidth:Float = labelText.length * 7;
+            if (rawTextWidth > measuredWidth)
+                measuredWidth = rawTextWidth;
+            var width = Std.int(Math.ceil(measuredWidth)) + 40;
+            if (width < 120)
+                width = 120;
+
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType != null && setFillWidthMember == null)
+                setFillWidthMember = HlxRuntime.resolveMember(flowType, "set_fillWidth");
+            if (flowType != null && setMinWidthMember == null)
+                setMinWidthMember = HlxRuntime.resolveMember(flowType, "set_minWidth");
+            if (flowType != null && setMaxWidthMember == null)
+                setMaxWidthMember = HlxRuntime.resolveMember(flowType, "set_maxWidth");
+            if (setFillWidthMember != null)
+                HlxRuntime.callResolved(setFillWidthMember, [button, false]);
+            if (setMinWidthMember != null)
+                HlxRuntime.callResolved(setMinWidthMember, [button, width]);
+            if (setMaxWidthMember != null)
+                HlxRuntime.callResolved(setMaxWidthMember, [button, width]);
+
+            applyInlineStyle(properties, "fill-width", false);
+            applyInlineStyle(properties, "width", width);
+            applyInlineStyle(properties, "min-width", width);
+            applyInlineStyle(properties, "max-width", width);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not size tab: " + Std.string(error));
+        }
     }
 
     static function setFlowHorizontalSpacing(properties:Dynamic, spacing:Int):Void {
