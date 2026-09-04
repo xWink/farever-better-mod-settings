@@ -166,21 +166,31 @@ class BetterModSettingsMod {
     }
 
     static function setNativeWindowTitle(windowProperties:Dynamic):Void {
+        var originalContentRoot:Dynamic = null;
         try {
-            var title:Dynamic = HlxRuntime.resolveField(windowProperties, "title");
-            if (title == null)
+            // Properties.createNew normally redirects children into
+            // title-window-content. Temporarily target the window object itself
+            // so #title is a direct TitleWindow child, matching the native DOM.
+            originalContentRoot = HlxRuntime.resolveField(windowProperties, "contentRoot");
+            var windowObject:Dynamic = HlxRuntime.resolveField(windowProperties, "obj");
+            if (windowObject == null)
                 return;
-            var titleObject:Dynamic = HlxRuntime.resolveField(title, "obj");
-            if (titleObject == null)
-                titleObject = title;
-            if (textType == null)
-                textType = HlxRuntime.resolveType("h2d.Text");
-            if (textType != null && setTitleTextMember == null)
-                setTitleTextMember = HlxRuntime.resolveMember(textType, "set_text");
-            if (setTitleTextMember != null)
-                HlxRuntime.callResolved(setTitleTextMember, [titleObject, "Mod Settings"]);
+            HlxRuntime.setField(windowProperties, "contentRoot", windowObject);
+            HlxRuntime.callResolved(createNewMember, [
+                "text",
+                windowProperties,
+                ["Mod Settings"],
+                { id: "title" }
+            ]);
         } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not set native window title: " + Std.string(error));
+            trace("[BetterModSettings] Could not create native window title: " + Std.string(error));
+        }
+        if (originalContentRoot != null) {
+            try {
+                HlxRuntime.setField(windowProperties, "contentRoot", originalContentRoot);
+            } catch (error:Dynamic) {
+                trace("[BetterModSettings] Could not restore window content root: " + Std.string(error));
+            }
         }
     }
 
@@ -348,7 +358,7 @@ class BetterModSettingsMod {
             };
 
             var panelProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "flow", settingsParentProperties, [], panelAttributes
+                "block", settingsParentProperties, [], panelAttributes
             ]);
             var panel:Dynamic = panelProperties == null
                 ? null
@@ -394,17 +404,9 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(setVisibleMember, [applyButton, false]);
 
             var optionsListProperties:Dynamic = HlxRuntime.resolveField(optionsList, "dom");
-            if (optionsListProperties == null)
-                return bodyProperties;
-            var modContainerProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "block",
-                optionsListProperties,
-                [],
-                { id: "modSettingsOptionsContainer" }
-            ]);
-            return modContainerProperties == null
+            return optionsListProperties == null
                 ? bodyProperties
-                : modContainerProperties;
+                : optionsListProperties;
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not prepare native options body: " + Std.string(error));
             return bodyProperties;
