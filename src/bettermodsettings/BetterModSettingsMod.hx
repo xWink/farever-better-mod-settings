@@ -13,6 +13,7 @@ class BetterModSettingsMod {
     static var capturingKeybind:Dynamic;
     static var nativeOptionLabelStyle:Dynamic;
     static var pendingOptionLabels:Array<Dynamic> = [];
+    static var pendingOptionRows:Array<Dynamic> = [];
     static var labelStyleFramesRemaining:Int = 0;
 
     static var propertiesType:hl.Bytes;
@@ -149,6 +150,7 @@ class BetterModSettingsMod {
 
             setNativeWindowTitle(windowProperties);
             pendingOptionLabels = [];
+            pendingOptionRows = [];
             labelStyleFramesRemaining = 0;
 
             var contentAttributes:Dynamic = {
@@ -384,7 +386,7 @@ class BetterModSettingsMod {
             if (panelProperties != null) {
                 styleFlow(panelProperties, 24, 24, 0);
                 setHorizontalPadding(panelProperties, 100);
-                setPersistentPanelLayout(panelProperties, 100, 24, 24);
+                setPersistentPanelLayout(panelProperties, 100, 34, 24);
                 sizeSettingsPanel(panelProperties);
                 buildModSettings(panelProperties, mod);
             }
@@ -649,7 +651,7 @@ class BetterModSettingsMod {
                 setTextColorMember = HlxRuntime.resolveMember(textType, "set_textColor");
 
             var font:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "font");
-            var color:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "textColor");
+            var color:Dynamic = 0x8A5F46;
             if (font != null && setFontMember != null)
                 HlxRuntime.callResolved(setFontMember, [label, font]);
             if (color != null && setTextColorMember != null)
@@ -668,43 +670,50 @@ class BetterModSettingsMod {
     }
 
     static function refreshPendingOptionLabelStyles():Void {
-        if (labelStyleFramesRemaining <= 0 || pendingOptionLabels.length == 0
-            || nativeOptionLabelStyle == null)
+        if (labelStyleFramesRemaining <= 0
+            || (pendingOptionLabels.length == 0 && pendingOptionRows.length == 0))
             return;
         labelStyleFramesRemaining--;
         try {
-            if (textType == null)
-                textType = HlxRuntime.resolveType("h2d.Text");
-            if (textType == null)
-                return;
-            if (setFontMember == null)
-                setFontMember = HlxRuntime.resolveMember(textType, "set_font");
-            if (setTextColorMember == null)
-                setTextColorMember = HlxRuntime.resolveMember(textType, "set_textColor");
+            for (line in pendingOptionRows)
+                centerOptionRowLabelAndSeparator(line);
 
-            var font:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "font");
-            var color:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "textColor");
-            for (label in pendingOptionLabels) {
-                if (label == null)
-                    continue;
-                if (font != null && setFontMember != null)
-                    HlxRuntime.callResolved(setFontMember, [label, font]);
-                if (color != null && setTextColorMember != null)
-                    HlxRuntime.callResolved(setTextColorMember, [label, color]);
-                for (field in ["scaleX", "scaleY", "letterSpacing", "lineSpacing"]) {
-                    try {
-                        var value:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, field);
-                        if (value != null)
-                            HlxRuntime.setField(label, field, value);
-                    } catch (_:Dynamic) {}
+            if (nativeOptionLabelStyle != null && pendingOptionLabels.length > 0) {
+                if (textType == null)
+                    textType = HlxRuntime.resolveType("h2d.Text");
+                if (textType == null)
+                    return;
+                if (setFontMember == null)
+                    setFontMember = HlxRuntime.resolveMember(textType, "set_font");
+                if (setTextColorMember == null)
+                    setTextColorMember = HlxRuntime.resolveMember(textType, "set_textColor");
+
+                var font:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "font");
+                var color:Dynamic = 0x8A5F46;
+                for (label in pendingOptionLabels) {
+                    if (label == null)
+                        continue;
+                    if (font != null && setFontMember != null)
+                        HlxRuntime.callResolved(setFontMember, [label, font]);
+                    if (setTextColorMember != null)
+                        HlxRuntime.callResolved(setTextColorMember, [label, color]);
+                    for (field in ["scaleX", "scaleY", "letterSpacing", "lineSpacing"]) {
+                        try {
+                            var value:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, field);
+                            if (value != null)
+                                HlxRuntime.setField(label, field, value);
+                        } catch (_:Dynamic) {}
+                    }
                 }
             }
         } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not refresh native option label styles: " + Std.string(error));
+            trace("[BetterModSettings] Could not refresh native option row styles: " + Std.string(error));
             labelStyleFramesRemaining = 0;
         }
-        if (labelStyleFramesRemaining <= 0)
+        if (labelStyleFramesRemaining <= 0) {
             pendingOptionLabels = [];
+            pendingOptionRows = [];
+        }
     }
 
     static function createOptionRow(
@@ -729,6 +738,8 @@ class BetterModSettingsMod {
             setFlowHorizontalSpacing(lineProperties, 12);
             var line:Dynamic = HlxRuntime.resolveField(lineProperties, "obj");
             applyNativeOptionLabelStyle(line);
+            pendingOptionRows.push(line);
+            centerOptionRowLabelAndSeparator(line);
             disableOptionRowHover(line);
             var container:Dynamic = line == null ? null : HlxRuntime.resolveField(line, "container");
             var containerProperties:Dynamic = container == null
@@ -738,6 +749,51 @@ class BetterModSettingsMod {
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not create native option row: " + Std.string(error));
             return parentProperties;
+        }
+    }
+
+    static function centerOptionRowLabelAndSeparator(line:Dynamic):Void {
+        if (line == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType != null && getFlowPropertiesMember == null)
+                getFlowPropertiesMember = HlxRuntime.resolveMember(flowType, "getProperties");
+            if (flowAlignType == null)
+                flowAlignType = HlxRuntime.resolveType("h2d.FlowAlign");
+            if (getFlowPropertiesMember == null || flowAlignType == null)
+                return;
+
+            var middle:Dynamic = HlxRuntime.constructEnum(flowAlignType, "Middle", []);
+            if (middle == null)
+                return;
+            var container:Dynamic = HlxRuntime.resolveField(line, "container");
+            var interactive:Dynamic = HlxRuntime.resolveField(line, "interactive");
+
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && getChildAtMember == null)
+                getChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "getChildAt");
+            if (h2dObjectType != null && getNumChildrenMember == null)
+                getNumChildrenMember = HlxRuntime.resolveMember(h2dObjectType, "get_numChildren");
+            if (getChildAtMember == null || getNumChildrenMember == null)
+                return;
+
+            var count:Int = cast HlxRuntime.callResolved(getNumChildrenMember, [line]);
+            for (index in 0...count) {
+                var child:Dynamic = HlxRuntime.callResolved(getChildAtMember, [line, index]);
+                if (child == null || child == container || child == interactive)
+                    continue;
+                var childProperties:Dynamic = HlxRuntime.callResolved(
+                    getFlowPropertiesMember,
+                    [line, child]
+                );
+                if (childProperties != null)
+                    HlxRuntime.setField(childProperties, "verticalAlign", middle);
+            }
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not align native option row: " + Std.string(error));
         }
     }
 
