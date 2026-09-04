@@ -391,9 +391,24 @@ class BetterModSettingsMod {
 
         var tabsAttributes:Dynamic = { id: "modTabs" };
         Reflect.setField(tabsAttributes, "class", "tabs");
+
+        // TitleWindow redirects its DOM contentRoot to bg-deco after building
+        // its own chrome. Native tabs are created before that redirect, as
+        // direct children of the window object. Temporarily reproduce that
+        // construction state so this element is styled and laid out as the
+        // real Options tabs, then restore the body root for OptionsContent.
+        var bodyContentRoot:Dynamic = HlxRuntime.resolveField(
+            windowProperties,
+            "contentRoot"
+        );
+        var windowObject:Dynamic = HlxRuntime.resolveField(windowProperties, "obj");
+        if (windowObject == null)
+            return;
+        HlxRuntime.setField(windowProperties, "contentRoot", windowObject);
         var tabs:Dynamic = HlxRuntime.callResolved(createNewMember, [
             "element", windowProperties, [], tabsAttributes
         ]);
+        HlxRuntime.setField(windowProperties, "contentRoot", bodyContentRoot);
         if (tabs == null)
             return;
 
