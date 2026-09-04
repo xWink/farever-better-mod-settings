@@ -76,8 +76,10 @@ class BetterModSettingsMod {
     static var initStyleMember:hlx.runtime.ResolvedMember;
     static var getObjectByNameMember:hlx.runtime.ResolvedMember;
     static var getChildAtMember:hlx.runtime.ResolvedMember;
+    static var getChildIndexMember:hlx.runtime.ResolvedMember;
     static var getNumChildrenMember:hlx.runtime.ResolvedMember;
     static var addChildMember:hlx.runtime.ResolvedMember;
+    static var addChildAtMember:hlx.runtime.ResolvedMember;
     static var setFontMember:hlx.runtime.ResolvedMember;
     static var setTextColorMember:hlx.runtime.ResolvedMember;
     static var setTextMaxWidthMember:hlx.runtime.ResolvedMember;
@@ -156,11 +158,58 @@ class BetterModSettingsMod {
                 return;
             }
 
+            placeButtonAfter(
+                menuListProperties,
+                modSettingsButton,
+                optionsButton
+            );
             HlxRuntime.callResolved(setOnClickMember, [modSettingsButton, openSettings]);
         } catch (error:Dynamic) {
             modSettingsButton = null;
             trace("[BetterModSettings] Could not add Escape menu button: " + Std.string(error));
         }
+    }
+
+    static function placeButtonAfter(
+        parentProperties:Dynamic,
+        button:Dynamic,
+        anchor:Dynamic
+    ):Void {
+        if (parentProperties == null || button == null || anchor == null)
+            return;
+
+        if (h2dObjectType == null)
+            h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+        if (h2dObjectType == null)
+            return;
+        if (getChildIndexMember == null)
+            getChildIndexMember = HlxRuntime.resolveMember(
+                h2dObjectType,
+                "getChildIndex"
+            );
+        if (addChildAtMember == null)
+            addChildAtMember = HlxRuntime.resolveMember(
+                h2dObjectType,
+                "addChildAt"
+            );
+        if (getChildIndexMember == null || addChildAtMember == null)
+            return;
+
+        var parent:Dynamic = HlxRuntime.resolveField(parentProperties, "obj");
+        if (parent == null)
+            return;
+        var rawAnchorIndex:Dynamic = HlxRuntime.callResolved(
+            getChildIndexMember,
+            [parent, anchor]
+        );
+        if (rawAnchorIndex == null)
+            return;
+        var anchorIndex:Int = cast rawAnchorIndex;
+        if (anchorIndex >= 0)
+            HlxRuntime.callResolved(
+                addChildAtMember,
+                [parent, button, anchorIndex + 1]
+            );
     }
 
     static function openSettings():Void {
