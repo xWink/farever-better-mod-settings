@@ -508,7 +508,6 @@ class BetterModSettingsMod {
                 setHorizontalPadding(panelProperties, 100);
                 setPersistentPanelLayout(panelProperties, 100, 34, 24);
                 sizeSettingsPanel(panelProperties);
-                enableVerticalScrolling(panelProperties);
                 buildModSettings(panelProperties, mod);
             }
         }
@@ -582,24 +581,69 @@ class BetterModSettingsMod {
             if (optionsList == null)
                 return bodyProperties;
             // HashLink keeps OptionsList.lines as ArrayObj, which cannot be
-            // safely iterated as Haxe Array<Dynamic>. Hide the generated Block
-            // wholesale and create our own native Block under the same OptionsList.
+            // safely iterated as Haxe Array<Dynamic>. Keep the generated Block
+            // because it is the native Options scroll container, but hide its
+            // generated option rows before inserting our mod panels into it.
             var nativeContainer:Dynamic = HlxRuntime.resolveField(optionsList, "container");
             nativeOptionLabelStyle = findFirstTextObject(nativeContainer, 4);
-            if (nativeContainer != null && setVisibleMember != null)
-                HlxRuntime.callResolved(setVisibleMember, [nativeContainer, false]);
+            hideNativeOptionsRows(nativeContainer);
 
             var applyButton:Dynamic = HlxRuntime.resolveField(optionsList, "applyBtn");
             if (applyButton != null && setVisibleMember != null)
                 HlxRuntime.callResolved(setVisibleMember, [applyButton, false]);
 
+            var nativeContainerProperties:Dynamic = nativeContainer == null
+                ? null
+                : HlxRuntime.resolveField(nativeContainer, "dom");
+            if (nativeContainerProperties != null)
+                return nativeContainerProperties;
             var optionsListProperties:Dynamic = HlxRuntime.resolveField(optionsList, "dom");
-            return optionsListProperties == null
-                ? bodyProperties
-                : optionsListProperties;
+            return optionsListProperties == null ? bodyProperties : optionsListProperties;
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not prepare native options body: " + Std.string(error));
             return bodyProperties;
+        }
+    }
+
+    static function hideNativeOptionsRows(container:Dynamic):Void {
+        if (container == null)
+            return;
+        try {
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && getChildAtMember == null)
+                getChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "getChildAt");
+            if (h2dObjectType != null && getNumChildrenMember == null)
+                getNumChildrenMember = HlxRuntime.resolveMember(
+                    h2dObjectType,
+                    "get_numChildren"
+                );
+            if (h2dObjectType != null && setVisibleMember == null)
+                setVisibleMember = HlxRuntime.resolveMember(h2dObjectType, "set_visible");
+            if (getChildAtMember == null || getNumChildrenMember == null
+                || setVisibleMember == null)
+                return;
+
+            // Preserve Flow's own background, input surface, and scrollbar.
+            var background:Dynamic = HlxRuntime.resolveField(container, "background");
+            var interactive:Dynamic = HlxRuntime.resolveField(container, "interactive");
+            var scrollBar:Dynamic = HlxRuntime.resolveField(container, "scrollBar");
+            var count:Int = cast HlxRuntime.callResolved(
+                getNumChildrenMember,
+                [container]
+            );
+            for (index in 0...count) {
+                var child:Dynamic = HlxRuntime.callResolved(
+                    getChildAtMember,
+                    [container, index]
+                );
+                if (child == null || child == background || child == interactive
+                    || child == scrollBar)
+                    continue;
+                HlxRuntime.callResolved(setVisibleMember, [child, false]);
+            }
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not hide native option rows: " + Std.string(error));
         }
     }
 
@@ -1340,39 +1384,6 @@ class BetterModSettingsMod {
             applyInlineStyle(properties, "max-height", height);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not set fixed tab viewport height: " + Std.string(error));
-        }
-    }
-
-    static function enableVerticalScrolling(properties:Dynamic):Void {
-        if (properties == null)
-            return;
-        try {
-            if (flowType == null)
-                flowType = HlxRuntime.resolveType("h2d.Flow");
-            if (flowOverflowType == null)
-                flowOverflowType = HlxRuntime.resolveType("h2d.FlowOverflow");
-            if (flowType == null || flowOverflowType == null)
-                return;
-            if (setOverflowMember == null)
-                setOverflowMember = HlxRuntime.resolveMember(flowType, "set_overflow");
-
-            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
-            var scroll:Dynamic = HlxRuntime.constructEnum(
-                flowOverflowType,
-                "Scroll",
-                []
-            );
-            if (flow == null || scroll == null)
-                return;
-
-            // Use Flow's native scrolling implementation, then apply the same
-            // DOMKit property so its scrollbar and cursor receive the game's
-            // standard Options styling.
-            if (setOverflowMember != null)
-                HlxRuntime.callResolved(setOverflowMember, [flow, scroll]);
-            applyInlineStyle(properties, "overflow", scroll);
-        } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not enable settings scrolling: " + Std.string(error));
         }
     }
 
