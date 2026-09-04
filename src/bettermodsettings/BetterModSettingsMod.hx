@@ -306,23 +306,22 @@ class BetterModSettingsMod {
         var tabs:Dynamic = HlxRuntime.callResolved(createNewMember, [
             "flow", contentProperties, [], tabsAttributes
         ]);
-        styleFlow(tabs, 0, 0, 10);
+        styleFlow(tabs, 12, 0, 10);
         setHorizontalPadding(tabs, 64);
 
-        var bodyAttributes:Dynamic = {
-            id: "modSettingsBody",
-            layout: "vertical"
-        };
-        Reflect.setField(
-            bodyAttributes,
-            "class",
-            "options-content content in-option-group"
-        );
+        // This must be the native OptionsContent component, not a generic flow
+        // carrying the same CSS classes. Its component identity is what activates
+        // the game's Options body background and OptionLine typography.
         var bodyProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-            "flow", contentProperties, [], bodyAttributes
+            "options-content",
+            contentProperties,
+            [0],
+            { id: "modSettingsBody" }
         ]);
         if (bodyProperties == null)
             bodyProperties = contentProperties;
+        else
+            hideNativeOptionsLists(bodyProperties);
         sizeBody(bodyProperties);
 
         var panels:Array<Dynamic> = [];
@@ -363,6 +362,29 @@ class BetterModSettingsMod {
             }
         }
         showPanel(panels, tabButtons, 0);
+    }
+
+    static function hideNativeOptionsLists(bodyProperties:Dynamic):Void {
+        try {
+            var body:Dynamic = HlxRuntime.resolveField(bodyProperties, "obj");
+            if (body == null)
+                return;
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && setVisibleMember == null)
+                setVisibleMember = HlxRuntime.resolveMember(h2dObjectType, "set_visible");
+            if (setVisibleMember == null)
+                return;
+
+            var optionsList:Dynamic = HlxRuntime.resolveField(body, "optionsList");
+            var inputList:Dynamic = HlxRuntime.resolveField(body, "inputList");
+            if (optionsList != null)
+                HlxRuntime.callResolved(setVisibleMember, [optionsList, false]);
+            if (inputList != null)
+                HlxRuntime.callResolved(setVisibleMember, [inputList, false]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not hide native option lists: " + Std.string(error));
+        }
     }
 
     static function showPanel(
