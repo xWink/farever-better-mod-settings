@@ -21,6 +21,7 @@ class BetterModSettingsMod {
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
     static var hxdKeyType:hl.Bytes;
+    static var optionsListType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
     static var setOnClickMember:hlx.runtime.ResolvedMember;
@@ -40,6 +41,7 @@ class BetterModSettingsMod {
     static var isKeyPressedMember:hlx.runtime.ResolvedMember;
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
+    static var setOptionsListMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -320,9 +322,8 @@ class BetterModSettingsMod {
         ]);
         if (bodyProperties == null)
             bodyProperties = contentProperties;
-        else
-            hideNativeOptionsLists(bodyProperties);
         sizeBody(bodyProperties);
+        var settingsParentProperties = prepareNativeOptionsBody(bodyProperties);
 
         var panels:Array<Dynamic> = [];
         var tabButtons:Array<Dynamic> = [];
@@ -349,7 +350,7 @@ class BetterModSettingsMod {
             };
 
             var panelProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "flow", bodyProperties, [], panelAttributes
+                "flow", settingsParentProperties, [], panelAttributes
             ]);
             var panel:Dynamic = panelProperties == null
                 ? null
@@ -364,26 +365,40 @@ class BetterModSettingsMod {
         showPanel(panels, tabButtons, 0);
     }
 
-    static function hideNativeOptionsLists(bodyProperties:Dynamic):Void {
+    static function prepareNativeOptionsBody(bodyProperties:Dynamic):Dynamic {
         try {
             var body:Dynamic = HlxRuntime.resolveField(bodyProperties, "obj");
             if (body == null)
-                return;
+                return bodyProperties;
             if (h2dObjectType == null)
                 h2dObjectType = HlxRuntime.resolveType("h2d.Object");
             if (h2dObjectType != null && setVisibleMember == null)
                 setVisibleMember = HlxRuntime.resolveMember(h2dObjectType, "set_visible");
-            if (setVisibleMember == null)
-                return;
+
+            // Keep OptionsList and its Block visible: the native stylesheet targets
+            // this exact ancestry when styling the body and OptionLine labels.
+            var inputList:Dynamic = HlxRuntime.resolveField(body, "inputList");
+            if (inputList != null && setVisibleMember != null)
+                HlxRuntime.callResolved(setVisibleMember, [inputList, false]);
 
             var optionsList:Dynamic = HlxRuntime.resolveField(body, "optionsList");
-            var inputList:Dynamic = HlxRuntime.resolveField(body, "inputList");
-            if (optionsList != null)
-                HlxRuntime.callResolved(setVisibleMember, [optionsList, false]);
-            if (inputList != null)
-                HlxRuntime.callResolved(setVisibleMember, [inputList, false]);
+            if (optionsList == null)
+                return bodyProperties;
+            if (optionsListType == null)
+                optionsListType = HlxRuntime.resolveType("ui.comp.OptionsList");
+            if (optionsListType != null && setOptionsListMember == null)
+                setOptionsListMember = HlxRuntime.resolveMember(optionsListType, "setList");
+            if (setOptionsListMember != null)
+                HlxRuntime.callResolved(setOptionsListMember, [optionsList, []]);
+
+            var container:Dynamic = HlxRuntime.resolveField(optionsList, "container");
+            if (container == null)
+                return bodyProperties;
+            var containerProperties:Dynamic = HlxRuntime.resolveField(container, "dom");
+            return containerProperties == null ? bodyProperties : containerProperties;
         } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not hide native option lists: " + Std.string(error));
+            trace("[BetterModSettings] Could not prepare native options body: " + Std.string(error));
+            return bodyProperties;
         }
     }
 
