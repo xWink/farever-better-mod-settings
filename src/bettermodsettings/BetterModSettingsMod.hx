@@ -508,6 +508,7 @@ class BetterModSettingsMod {
                 setHorizontalPadding(panelProperties, 100);
                 setPersistentPanelLayout(panelProperties, 100, 34, 24);
                 sizeSettingsPanel(panelProperties);
+                enableVerticalScrolling(panelProperties);
                 buildModSettings(panelProperties, mod);
             }
         }
@@ -1339,6 +1340,39 @@ class BetterModSettingsMod {
             applyInlineStyle(properties, "max-height", height);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not set fixed tab viewport height: " + Std.string(error));
+        }
+    }
+
+    static function enableVerticalScrolling(properties:Dynamic):Void {
+        if (properties == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowOverflowType == null)
+                flowOverflowType = HlxRuntime.resolveType("h2d.FlowOverflow");
+            if (flowType == null || flowOverflowType == null)
+                return;
+            if (setOverflowMember == null)
+                setOverflowMember = HlxRuntime.resolveMember(flowType, "set_overflow");
+
+            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            var scroll:Dynamic = HlxRuntime.constructEnum(
+                flowOverflowType,
+                "Scroll",
+                []
+            );
+            if (flow == null || scroll == null)
+                return;
+
+            // Use Flow's native scrolling implementation, then apply the same
+            // DOMKit property so its scrollbar and cursor receive the game's
+            // standard Options styling.
+            if (setOverflowMember != null)
+                HlxRuntime.callResolved(setOverflowMember, [flow, scroll]);
+            applyInlineStyle(properties, "overflow", scroll);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not enable settings scrolling: " + Std.string(error));
         }
     }
 
