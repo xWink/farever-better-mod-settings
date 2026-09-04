@@ -1393,11 +1393,41 @@ class BetterModSettingsMod {
             var page = pages[pageIndex];
             for (index in 0...tabButtons.length) {
                 var button = tabButtons[index];
-                if (button != null)
+                if (button != null) {
+                    // Tabs inherit per-child alignment and padding from the
+                    // native .tabs rule. Those values override the viewport's
+                    // alignment and cause each page to redistribute its tabs.
+                    // Normalize the actual FlowProperties so only the
+                    // viewport's fixed hspacing controls their positions.
+                    if (flowType != null && getFlowPropertiesMember == null)
+                        getFlowPropertiesMember = HlxRuntime.resolveMember(
+                            flowType,
+                            "getProperties"
+                        );
+                    var tabFlowProperties:Dynamic = getFlowPropertiesMember == null
+                        ? null
+                        : HlxRuntime.callResolved(
+                            getFlowPropertiesMember,
+                            [viewport, button]
+                        );
+                    if (tabFlowProperties != null) {
+                        HlxRuntime.setField(
+                            tabFlowProperties,
+                            "horizontalAlign",
+                            left
+                        );
+                        HlxRuntime.setField(tabFlowProperties, "paddingLeft", 0);
+                        HlxRuntime.setField(tabFlowProperties, "paddingRight", 0);
+                        HlxRuntime.setField(tabFlowProperties, "offsetX", 0);
+                        HlxRuntime.setField(tabFlowProperties, "lineBreak", false);
+                        HlxRuntime.setField(tabFlowProperties, "isAbsolute", false);
+                        HlxRuntime.setField(tabFlowProperties, "autoSizeWidth", null);
+                    }
                     HlxRuntime.callResolved(setVisibleMember, [
                         button,
                         page.indexOf(index) >= 0
                     ]);
+                }
             }
 
             if (flowType != null && setNeedReflowMember == null)
