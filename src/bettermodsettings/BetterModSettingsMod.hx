@@ -40,7 +40,6 @@ class BetterModSettingsMod {
     static var isKeyPressedMember:hlx.runtime.ResolvedMember;
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
-    static var addChildAtMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -177,21 +176,12 @@ class BetterModSettingsMod {
             if (windowObject == null)
                 return;
             HlxRuntime.setField(windowProperties, "contentRoot", windowObject);
-            var titleProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+            HlxRuntime.callResolved(createNewMember, [
                 "text",
                 windowProperties,
                 ["Mod Settings"],
                 { id: "title" }
             ]);
-            var titleObject:Dynamic = titleProperties == null
-                ? null
-                : HlxRuntime.resolveField(titleProperties, "obj");
-            if (h2dObjectType == null)
-                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
-            if (h2dObjectType != null && addChildAtMember == null)
-                addChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "addChildAt");
-            if (titleObject != null && addChildAtMember != null)
-                HlxRuntime.callResolved(addChildAtMember, [windowObject, titleObject, 0]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not create native window title: " + Std.string(error));
         }
