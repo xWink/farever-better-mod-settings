@@ -1613,9 +1613,9 @@ class BetterModSettingsMod {
             HlxRuntime.callResolved(setOnClickMember, [
                 previousArrow,
                 function():Void {
-                    if (currentPage <= 0)
-                        return;
-                    currentPage--;
+                    currentPage = currentPage <= 0
+                        ? pages.length - 1
+                        : currentPage - 1;
                     showTabPage(
                         headerProperties,
                         viewportProperties,
@@ -1629,9 +1629,9 @@ class BetterModSettingsMod {
             HlxRuntime.callResolved(setOnClickMember, [
                 nextArrow,
                 function():Void {
-                    if (currentPage >= pages.length - 1)
-                        return;
-                    currentPage++;
+                    currentPage = currentPage >= pages.length - 1
+                        ? 0
+                        : currentPage + 1;
                     showTabPage(
                         headerProperties,
                         viewportProperties,
