@@ -17,6 +17,7 @@ class BetterModSettingsMod {
     static var h2dObjectType:hl.Bytes;
     static var titleWindowType:hl.Bytes;
     static var flowType:hl.Bytes;
+    static var flowPropertiesType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
@@ -41,6 +42,8 @@ class BetterModSettingsMod {
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
     static var initStyleMember:hlx.runtime.ResolvedMember;
+    static var getFlowPropertiesMember:hlx.runtime.ResolvedMember;
+    static var setFlowAbsoluteMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -167,18 +170,53 @@ class BetterModSettingsMod {
     }
 
     static function setNativeWindowTitle(windowProperties:Dynamic):Void {
+        var originalContentRoot:Dynamic = null;
         try {
-            // TitleWindow routes normal children into title-window-content.
-            // Creating this first makes it precede the tab strip without
-            // desynchronizing DOMKit through raw scene-graph reparenting.
-            HlxRuntime.callResolved(createNewMember, [
+            originalContentRoot = HlxRuntime.resolveField(windowProperties, "contentRoot");
+            var windowObject:Dynamic = HlxRuntime.resolveField(windowProperties, "obj");
+            if (windowObject == null)
+                return;
+
+            // Create #title as a real direct child of TitleWindow, then mark it
+            // absolute through FlowProperties. Unlike addChildAt, this never
+            // reparents a DOMKit-managed object after creation.
+            HlxRuntime.setField(windowProperties, "contentRoot", windowObject);
+            var titleProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "text",
                 windowProperties,
                 ["Mod Settings"],
                 { id: "title" }
             ]);
+            var titleObject:Dynamic = titleProperties == null
+                ? null
+                : HlxRuntime.resolveField(titleProperties, "obj");
+
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType != null && getFlowPropertiesMember == null)
+                getFlowPropertiesMember = HlxRuntime.resolveMember(flowType, "getProperties");
+            if (flowPropertiesType == null)
+                flowPropertiesType = HlxRuntime.resolveType("h2d.FlowProperties");
+            if (flowPropertiesType != null && setFlowAbsoluteMember == null)
+                setFlowAbsoluteMember = HlxRuntime.resolveMember(flowPropertiesType, "set_isAbsolute");
+            if (titleObject != null && getFlowPropertiesMember != null
+                && setFlowAbsoluteMember != null) {
+                var flowProperties:Dynamic = HlxRuntime.callResolved(
+                    getFlowPropertiesMember,
+                    [windowObject, titleObject]
+                );
+                if (flowProperties != null)
+                    HlxRuntime.callResolved(setFlowAbsoluteMember, [flowProperties, true]);
+            }
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not create native window title: " + Std.string(error));
+        }
+        if (originalContentRoot != null) {
+            try {
+                HlxRuntime.setField(windowProperties, "contentRoot", originalContentRoot);
+            } catch (error:Dynamic) {
+                trace("[BetterModSettings] Could not restore window content root: " + Std.string(error));
+            }
         }
     }
 
@@ -367,10 +405,43 @@ class BetterModSettingsMod {
             if (panelProperties != null) {
                 styleFlow(panelProperties, 4, 14, 0);
                 setHorizontalPadding(panelProperties, 64);
+                sizeSettingsPanel(panelProperties);
                 buildModSettings(panelProperties, mod);
             }
         }
         showPanel(panels, tabButtons, 0);
+    }
+
+    static function sizeSettingsPanel(panelProperties:Dynamic):Void {
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType == null)
+                return;
+            if (setMinHeightMember == null)
+                setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
+            if (setMaxHeightMember == null)
+                setMaxHeightMember = HlxRuntime.resolveMember(flowType, "set_maxHeight");
+            var panel:Dynamic = HlxRuntime.resolveField(panelProperties, "obj");
+            if (panel == null)
+                return;
+            if (setMinHeightMember != null)
+                HlxRuntime.callResolved(setMinHeightMember, [panel, 460]);
+            if (setMaxHeightMember != null)
+                HlxRuntime.callResolved(setMaxHeightMember, [panel, 460]);
+
+            if (propertiesType == null)
+                propertiesType = HlxRuntime.resolveType("domkit.Properties");
+            if (propertiesType != null && initStyleMember == null)
+                initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
+            if (initStyleMember != null) {
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "height", 460]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "min-height", 460]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "max-height", 460]);
+            }
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not size settings panel: " + Std.string(error));
+        }
     }
 
     static function prepareNativeOptionsBody(bodyProperties:Dynamic):Dynamic {
