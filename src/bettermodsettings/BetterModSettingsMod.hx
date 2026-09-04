@@ -21,7 +21,6 @@ class BetterModSettingsMod {
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
     static var hxdKeyType:hl.Bytes;
-    static var optionsListType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
     static var setOnClickMember:hlx.runtime.ResolvedMember;
@@ -41,7 +40,6 @@ class BetterModSettingsMod {
     static var isKeyPressedMember:hlx.runtime.ResolvedMember;
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
-    static var setOptionsListMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -384,12 +382,19 @@ class BetterModSettingsMod {
             var optionsList:Dynamic = HlxRuntime.resolveField(body, "optionsList");
             if (optionsList == null)
                 return bodyProperties;
-            if (optionsListType == null)
-                optionsListType = HlxRuntime.resolveType("ui.comp.OptionsList");
-            if (optionsListType != null && setOptionsListMember == null)
-                setOptionsListMember = HlxRuntime.resolveMember(optionsListType, "setList");
-            if (setOptionsListMember != null)
-                HlxRuntime.callResolved(setOptionsListMember, [optionsList, []]);
+            // setList([]) cannot safely cross the reflective boundary because
+            // OptionsList expects a concrete game array type. Hide the rows it
+            // already created instead, then reuse its native Block.
+            var nativeLines:Array<Dynamic> = cast HlxRuntime.resolveField(optionsList, "lines");
+            if (nativeLines != null && setVisibleMember != null) {
+                for (line in nativeLines) {
+                    if (line != null)
+                        HlxRuntime.callResolved(setVisibleMember, [line, false]);
+                }
+            }
+            var applyButton:Dynamic = HlxRuntime.resolveField(optionsList, "applyBtn");
+            if (applyButton != null && setVisibleMember != null)
+                HlxRuntime.callResolved(setVisibleMember, [applyButton, false]);
 
             var container:Dynamic = HlxRuntime.resolveField(optionsList, "container");
             if (container == null)
