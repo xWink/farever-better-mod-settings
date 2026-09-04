@@ -43,6 +43,7 @@ class BetterModSettingsMod {
     static var setPaddingRightMember:hlx.runtime.ResolvedMember;
     static var setVerticalSpacingMember:hlx.runtime.ResolvedMember;
     static var setHorizontalSpacingMember:hlx.runtime.ResolvedMember;
+    static var setHorizontalAlignMember:hlx.runtime.ResolvedMember;
     static var setSelectedMember:hlx.runtime.ResolvedMember;
     static var setButtonTextMember:hlx.runtime.ResolvedMember;
     static var setTitleTextMember:hlx.runtime.ResolvedMember;
@@ -311,9 +312,9 @@ class BetterModSettingsMod {
             if (setMaxWidthMember != null)
                 HlxRuntime.callResolved(setMaxWidthMember, [body, 990]);
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [body, 460]);
+                HlxRuntime.callResolved(setMinHeightMember, [body, 500]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [body, 460]);
+                HlxRuntime.callResolved(setMaxHeightMember, [body, 500]);
 
             // Flow dimensions are later overwritten by DOMKit's component CSS.
             // Inline styles participate in that same cascade and survive reflow.
@@ -325,9 +326,9 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(initStyleMember, [bodyProperties, "width", 990]);
                 HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-width", 990]);
                 HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-width", 990]);
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "height", 460]);
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-height", 460]);
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-height", 460]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-height", 500]);
             }
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings body: " + Std.string(error));
@@ -411,6 +412,7 @@ class BetterModSettingsMod {
         HlxRuntime.setField(windowProperties, "contentRoot", bodyContentRoot);
         if (tabs == null)
             return;
+        increaseHorizontalSpacing(tabs, 20);
 
         // This must be the native OptionsContent component, not a generic flow
         // carrying the same CSS classes. Its component identity is what activates
@@ -440,6 +442,7 @@ class BetterModSettingsMod {
             tabButtons.push(tabButton);
             if (tabButton != null) {
                 prepareSettingControl(tabs, tab, false);
+                centerFlowContents(tab);
                 var selectedIndex = index;
                 HlxRuntime.callResolved(setOnClickMember, [tabButton, function():Void {
                     showPanel(panels, tabButtons, selectedIndex);
@@ -483,18 +486,18 @@ class BetterModSettingsMod {
             if (panel == null)
                 return;
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [panel, 460]);
+                HlxRuntime.callResolved(setMinHeightMember, [panel, 500]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [panel, 460]);
+                HlxRuntime.callResolved(setMaxHeightMember, [panel, 500]);
 
             if (propertiesType == null)
                 propertiesType = HlxRuntime.resolveType("domkit.Properties");
             if (propertiesType != null && initStyleMember == null)
                 initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
             if (initStyleMember != null) {
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "height", 460]);
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "min-height", 460]);
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "max-height", 460]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "min-height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "max-height", 500]);
             }
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings panel: " + Std.string(error));
@@ -978,6 +981,64 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(setHorizontalSpacingMember, [flow, spacing]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not space native option row: " + Std.string(error));
+        }
+    }
+
+    static function increaseHorizontalSpacing(
+        properties:Dynamic,
+        additionalSpacing:Int
+    ):Void {
+        if (properties == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType != null && setHorizontalSpacingMember == null)
+                setHorizontalSpacingMember = HlxRuntime.resolveMember(
+                    flowType,
+                    "set_horizontalSpacing"
+                );
+            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            if (flow == null || setHorizontalSpacingMember == null)
+                return;
+            var currentSpacing:Dynamic = HlxRuntime.resolveField(
+                flow,
+                "horizontalSpacing"
+            );
+            var spacing:Int = additionalSpacing;
+            if (currentSpacing != null)
+                spacing += Std.int(currentSpacing);
+            HlxRuntime.callResolved(setHorizontalSpacingMember, [flow, spacing]);
+            applyInlineStyle(properties, "hspacing", spacing);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not space native tabs: " + Std.string(error));
+        }
+    }
+
+    static function centerFlowContents(properties:Dynamic):Void {
+        if (properties == null)
+            return;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType != null && setHorizontalAlignMember == null)
+                setHorizontalAlignMember = HlxRuntime.resolveMember(
+                    flowType,
+                    "set_horizontalAlign"
+                );
+            if (flowAlignType == null)
+                flowAlignType = HlxRuntime.resolveType("h2d.FlowAlign");
+            var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
+            var middle:Dynamic = flowAlignType == null
+                ? null
+                : HlxRuntime.constructEnum(flowAlignType, "Middle", []);
+            if (flow == null || middle == null)
+                return;
+            if (setHorizontalAlignMember != null)
+                HlxRuntime.callResolved(setHorizontalAlignMember, [flow, middle]);
+            applyInlineStyle(properties, "halign", middle);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not center native tab text: " + Std.string(error));
         }
     }
 
