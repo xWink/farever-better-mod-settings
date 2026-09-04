@@ -18,6 +18,7 @@ class BetterModSettingsMod {
     static var pendingOptionRows:Array<Dynamic> = [];
     static var pendingTabLabels:Array<Dynamic> = [];
     static var labelStyleFramesRemaining:Int = 0;
+    static var pendingTabHeaderProperties:Dynamic;
     static var pendingTabViewportProperties:Dynamic;
     static var pendingTabButtons:Array<Dynamic> = [];
     static var pendingTabFallbackWidths:Array<Int> = [];
@@ -515,6 +516,7 @@ class BetterModSettingsMod {
             "modTabsNextPage"
         );
         configureTabPagination(
+            tabs,
             tabViewport,
             tabButtons,
             tabWidths,
@@ -1207,17 +1209,17 @@ class BetterModSettingsMod {
             if (parent == null || viewport == null)
                 return 0;
 
-            var spacingValue:Dynamic = HlxRuntime.resolveField(
-                parent,
-                "horizontalSpacing"
-            );
-            var spacing = spacingValue == null ? 0 : Std.int(spacingValue);
-            var viewportWidth = 970 - 64 - spacing * 2;
+            // The outer row only separates each arrow from the tab viewport.
+            // Tab-to-tab spacing is controlled independently inside the viewport.
+            var arrowGap = 10;
+            var tabGap = 20;
+            setFlowHorizontalSpacing(parentProperties, arrowGap);
+            var viewportWidth = 970 - 64 - arrowGap * 2;
             if (viewportWidth < 120)
                 viewportWidth = 120;
 
             setFixedFlowWidth(viewportProperties, viewportWidth);
-            setFlowHorizontalSpacing(viewportProperties, spacing);
+            setFlowHorizontalSpacing(viewportProperties, tabGap);
             prepareSettingControl(parentProperties, viewportProperties, false);
 
             if (setMultilineMember == null)
@@ -1341,6 +1343,7 @@ class BetterModSettingsMod {
     }
 
     static function showTabPage(
+        headerProperties:Dynamic,
         viewportProperties:Dynamic,
         tabButtons:Array<Dynamic>,
         pages:Array<Array<Int>>,
@@ -1356,6 +1359,37 @@ class BetterModSettingsMod {
             if (setVisibleMember == null)
                 return;
 
+            // Native tab styling is applied after construction and otherwise
+            // restores centered distribution. Reassert the fixed navigation
+            // geometry whenever a page is shown.
+            setFlowHorizontalSpacing(headerProperties, 10);
+            setFlowHorizontalSpacing(viewportProperties, 20);
+            setFixedFlowWidth(viewportProperties, 886);
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowAlignType == null)
+                flowAlignType = HlxRuntime.resolveType("h2d.FlowAlign");
+            if (flowType != null && setHorizontalAlignMember == null)
+                setHorizontalAlignMember = HlxRuntime.resolveMember(
+                    flowType,
+                    "set_horizontalAlign"
+                );
+            var viewport:Dynamic = HlxRuntime.resolveField(
+                viewportProperties,
+                "obj"
+            );
+            var left:Dynamic = flowAlignType == null
+                ? null
+                : HlxRuntime.constructEnum(flowAlignType, "Left", []);
+            if (viewport != null && left != null
+                && setHorizontalAlignMember != null)
+                HlxRuntime.callResolved(setHorizontalAlignMember, [
+                    viewport,
+                    left
+                ]);
+            if (left != null)
+                applyInlineStyle(viewportProperties, "halign", left);
+
             var page = pages[pageIndex];
             for (index in 0...tabButtons.length) {
                 var button = tabButtons[index];
@@ -1366,22 +1400,23 @@ class BetterModSettingsMod {
                     ]);
             }
 
-            if (flowType == null)
-                flowType = HlxRuntime.resolveType("h2d.Flow");
             if (flowType != null && setNeedReflowMember == null)
                 setNeedReflowMember = HlxRuntime.resolveMember(flowType, "set_needReflow");
-            var viewport:Dynamic = HlxRuntime.resolveField(
-                viewportProperties,
-                "obj"
-            );
             if (viewport != null && setNeedReflowMember != null)
                 HlxRuntime.callResolved(setNeedReflowMember, [viewport, true]);
+            var header:Dynamic = HlxRuntime.resolveField(
+                headerProperties,
+                "obj"
+            );
+            if (header != null && setNeedReflowMember != null)
+                HlxRuntime.callResolved(setNeedReflowMember, [header, true]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not show tab page: " + Std.string(error));
         }
     }
 
     static function configureTabPagination(
+        headerProperties:Dynamic,
         viewportProperties:Dynamic,
         tabButtons:Array<Dynamic>,
         fallbackWidths:Array<Int>,
@@ -1389,7 +1424,8 @@ class BetterModSettingsMod {
         nextArrowProperties:Dynamic,
         availableWidth:Int
     ):Void {
-        if (viewportProperties == null || previousArrowProperties == null
+        if (headerProperties == null || viewportProperties == null
+            || previousArrowProperties == null
             || nextArrowProperties == null || tabButtons.length == 0
             || availableWidth <= 0)
             return;
@@ -1413,6 +1449,7 @@ class BetterModSettingsMod {
                 viewport,
                 "horizontalSpacing"
             );
+            pendingTabHeaderProperties = headerProperties;
             pendingTabViewportProperties = viewportProperties;
             pendingTabButtons = tabButtons;
             pendingTabFallbackWidths = fallbackWidths;
@@ -1469,6 +1506,7 @@ class BetterModSettingsMod {
             if (pages.length == 0)
                 return;
 
+            var headerProperties = pendingTabHeaderProperties;
             var viewportProperties = pendingTabViewportProperties;
             var tabButtons = pendingTabButtons;
             var previousArrow = pendingTabPreviousArrow;
@@ -1482,6 +1520,7 @@ class BetterModSettingsMod {
                         return;
                     currentPage--;
                     showTabPage(
+                        headerProperties,
                         viewportProperties,
                         tabButtons,
                         pages,
@@ -1496,6 +1535,7 @@ class BetterModSettingsMod {
                         return;
                     currentPage++;
                     showTabPage(
+                        headerProperties,
                         viewportProperties,
                         tabButtons,
                         pages,
@@ -1503,11 +1543,18 @@ class BetterModSettingsMod {
                     );
                 }
             ]);
-            showTabPage(viewportProperties, tabButtons, pages, currentPage);
+            showTabPage(
+                headerProperties,
+                viewportProperties,
+                tabButtons,
+                pages,
+                currentPage
+            );
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not finalize tab pagination: " + Std.string(error));
         }
 
+        pendingTabHeaderProperties = null;
         pendingTabViewportProperties = null;
         pendingTabButtons = [];
         pendingTabFallbackWidths = [];
@@ -1528,6 +1575,7 @@ class BetterModSettingsMod {
             var flow:Dynamic = HlxRuntime.resolveField(properties, "obj");
             if (flow != null && setHorizontalSpacingMember != null)
                 HlxRuntime.callResolved(setHorizontalSpacingMember, [flow, spacing]);
+            applyInlineStyle(properties, "hspacing", spacing);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not space native option row: " + Std.string(error));
         }
