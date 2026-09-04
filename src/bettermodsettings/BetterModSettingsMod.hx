@@ -19,6 +19,7 @@ class BetterModSettingsMod {
     static var flowType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
     static var buttonType:hl.Bytes;
+    static var textType:hl.Bytes;
     static var hxdKeyType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
@@ -34,6 +35,8 @@ class BetterModSettingsMod {
     static var setHorizontalSpacingMember:hlx.runtime.ResolvedMember;
     static var setSelectedMember:hlx.runtime.ResolvedMember;
     static var setButtonTextMember:hlx.runtime.ResolvedMember;
+    static var setTitleTextMember:hlx.runtime.ResolvedMember;
+    static var setUiSelectedMember:hlx.runtime.ResolvedMember;
     static var isKeyPressedMember:hlx.runtime.ResolvedMember;
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
@@ -134,10 +137,13 @@ class BetterModSettingsMod {
                 return;
             }
 
+            setNativeWindowTitle(windowProperties);
+
             var contentAttributes:Dynamic = {
                 id: "betterModSettingsContent",
                 layout: "vertical"
             };
+            Reflect.setField(contentAttributes, "class", "options-content in-option-group");
             var contentProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "flow",
                 windowProperties,
@@ -157,6 +163,25 @@ class BetterModSettingsMod {
         } catch (error:Dynamic) {
             nativeSettingsWindow = null;
             trace("[BetterModSettings] Could not open native settings window: " + Std.string(error));
+        }
+    }
+
+    static function setNativeWindowTitle(windowProperties:Dynamic):Void {
+        try {
+            var title:Dynamic = HlxRuntime.resolveField(windowProperties, "title");
+            if (title == null)
+                return;
+            var titleObject:Dynamic = HlxRuntime.resolveField(title, "obj");
+            if (titleObject == null)
+                titleObject = title;
+            if (textType == null)
+                textType = HlxRuntime.resolveType("h2d.Text");
+            if (textType != null && setTitleTextMember == null)
+                setTitleTextMember = HlxRuntime.resolveMember(textType, "set_text");
+            if (setTitleTextMember != null)
+                HlxRuntime.callResolved(setTitleTextMember, [titleObject, "Mod Settings"]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not set native window title: " + Std.string(error));
         }
     }
 
@@ -242,7 +267,6 @@ class BetterModSettingsMod {
     }
 
     static function buildSettingsContent(contentProperties:Dynamic):Void {
-        createText(contentProperties, "Mod Settings", "title");
         if (compatibleMods.length == 0) {
             createText(contentProperties, "No compatible mods were found.", "noCompatibleMods");
             return;
@@ -256,6 +280,7 @@ class BetterModSettingsMod {
         styleFlow(tabs, 0, 0, 10);
 
         var panels:Array<Dynamic> = [];
+        var tabButtons:Array<Dynamic> = [];
         for (index in 0...compatibleMods.length) {
             var mod:Dynamic = compatibleMods[index];
             var tab:Dynamic = HlxRuntime.callResolved(createNewMember, [
@@ -265,10 +290,11 @@ class BetterModSettingsMod {
                 { id: "modTab" + index }
             ]);
             var tabButton:Dynamic = tab == null ? null : HlxRuntime.resolveField(tab, "obj");
+            tabButtons.push(tabButton);
             if (tabButton != null) {
                 var selectedIndex = index;
                 HlxRuntime.callResolved(setOnClickMember, [tabButton, function():Void {
-                    showPanel(panels, selectedIndex);
+                    showPanel(panels, tabButtons, selectedIndex);
                 }]);
             }
 
@@ -289,20 +315,32 @@ class BetterModSettingsMod {
                 buildModSettings(panelProperties, mod);
             }
         }
-        showPanel(panels, 0);
+        showPanel(panels, tabButtons, 0);
     }
 
-    static function showPanel(panels:Array<Dynamic>, selectedIndex:Int):Void {
+    static function showPanel(
+        panels:Array<Dynamic>,
+        tabButtons:Array<Dynamic>,
+        selectedIndex:Int
+    ):Void {
         if (h2dObjectType == null)
             h2dObjectType = HlxRuntime.resolveType("h2d.Object");
         if (h2dObjectType != null && setVisibleMember == null)
             setVisibleMember = HlxRuntime.resolveMember(h2dObjectType, "set_visible");
         if (setVisibleMember == null)
             return;
+        if (uiElementType != null && setUiSelectedMember == null)
+            setUiSelectedMember = HlxRuntime.resolveMember(uiElementType, "set_selected");
 
         for (index in 0...panels.length) {
             if (panels[index] != null)
                 HlxRuntime.callResolved(setVisibleMember, [panels[index], index == selectedIndex]);
+            if (index < tabButtons.length && tabButtons[index] != null
+                && setUiSelectedMember != null)
+                HlxRuntime.callResolved(setUiSelectedMember, [
+                    tabButtons[index],
+                    index == selectedIndex
+                ]);
         }
     }
 
