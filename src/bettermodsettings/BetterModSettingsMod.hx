@@ -1415,6 +1415,9 @@ class BetterModSettingsMod {
             var left:Dynamic = flowAlignType == null
                 ? null
                 : HlxRuntime.constructEnum(flowAlignType, "Left", []);
+            var middle:Dynamic = flowAlignType == null
+                ? null
+                : HlxRuntime.constructEnum(flowAlignType, "Middle", []);
             if (viewport != null && left != null
                 && setHorizontalAlignMember != null)
                 HlxRuntime.callResolved(setHorizontalAlignMember, [
@@ -1439,11 +1442,10 @@ class BetterModSettingsMod {
                 var button = tabButtons[index];
                 if (button != null) {
                     var visible = page.indexOf(index) >= 0;
-                    // Tabs inherit per-child alignment and padding from the
-                    // native .tabs rule. Those values override the viewport's
-                    // alignment and cause each page to redistribute its tabs.
-                    // Make each tab absolute, anchor it to the left, and give
-                    // it an explicit cumulative offset that Flow will preserve.
+                    // Native tab styling reapplies Middle to each absolute
+                    // child. Account for that centered origin in the offset so
+                    // the first tab starts at the viewport's left edge and each
+                    // later tab follows it at the requested spacing.
                     if (flowType != null && getFlowPropertiesMember == null)
                         getFlowPropertiesMember = HlxRuntime.resolveMember(
                             flowType,
@@ -1459,14 +1461,16 @@ class BetterModSettingsMod {
                         HlxRuntime.setField(
                             tabFlowProperties,
                             "horizontalAlign",
-                            left
+                            middle
                         );
                         HlxRuntime.setField(tabFlowProperties, "paddingLeft", 0);
                         HlxRuntime.setField(tabFlowProperties, "paddingRight", 0);
                         HlxRuntime.setField(
                             tabFlowProperties,
                             "offsetX",
-                            visible ? tabX : 0
+                            visible && index < tabWidths.length
+                                ? tabX - Std.int((886 - tabWidths[index]) * 0.5)
+                                : 0
                         );
                         HlxRuntime.setField(tabFlowProperties, "lineBreak", false);
                         HlxRuntime.setField(tabFlowProperties, "autoSizeWidth", null);
