@@ -18,6 +18,14 @@ class BetterModSettingsMod {
     static var pendingOptionRows:Array<Dynamic> = [];
     static var pendingTabLabels:Array<Dynamic> = [];
     static var labelStyleFramesRemaining:Int = 0;
+    static var pendingTabViewportProperties:Dynamic;
+    static var pendingTabButtons:Array<Dynamic> = [];
+    static var pendingTabFallbackWidths:Array<Int> = [];
+    static var pendingTabPreviousArrow:Dynamic;
+    static var pendingTabNextArrow:Dynamic;
+    static var pendingTabPageWidth:Int = 0;
+    static var pendingTabSpacing:Int = 0;
+    static var tabPaginationFramesRemaining:Int = 0;
 
     static var propertiesType:hl.Bytes;
     static var componentType:hl.Bytes;
@@ -27,6 +35,7 @@ class BetterModSettingsMod {
     static var baseUIType:hl.Bytes;
     static var flowType:hl.Bytes;
     static var flowAlignType:hl.Bytes;
+    static var flowOverflowType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
@@ -45,6 +54,7 @@ class BetterModSettingsMod {
     static var setVerticalSpacingMember:hlx.runtime.ResolvedMember;
     static var setHorizontalSpacingMember:hlx.runtime.ResolvedMember;
     static var setHorizontalAlignMember:hlx.runtime.ResolvedMember;
+    static var setOverflowMember:hlx.runtime.ResolvedMember;
     static var setMultilineMember:hlx.runtime.ResolvedMember;
     static var setFillWidthMember:hlx.runtime.ResolvedMember;
     static var setNeedReflowMember:hlx.runtime.ResolvedMember;
@@ -59,11 +69,13 @@ class BetterModSettingsMod {
     static var getObjectByNameMember:hlx.runtime.ResolvedMember;
     static var getChildAtMember:hlx.runtime.ResolvedMember;
     static var getNumChildrenMember:hlx.runtime.ResolvedMember;
+    static var addChildMember:hlx.runtime.ResolvedMember;
     static var setFontMember:hlx.runtime.ResolvedMember;
     static var setTextColorMember:hlx.runtime.ResolvedMember;
     static var setTextMaxWidthMember:hlx.runtime.ResolvedMember;
     static var setTextLineBreakMember:hlx.runtime.ResolvedMember;
     static var getTextWidthMember:hlx.runtime.ResolvedMember;
+    static var getOuterWidthMember:hlx.runtime.ResolvedMember;
     static var getFlowPropertiesMember:hlx.runtime.ResolvedMember;
     static var displayWindowMember:hlx.runtime.ResolvedMember;
 
@@ -73,6 +85,7 @@ class BetterModSettingsMod {
     static function afterGameAppUpdate(instance:Dynamic, dt:Float, result:Void):Void {
         capturePressedKey();
         refreshPendingOptionLabelStyles();
+        refreshPendingTabPagination();
     }
 
     @:hlx.prefix(ui.win.BaseWindow.closeSelfOnOpen)
@@ -427,6 +440,13 @@ class BetterModSettingsMod {
             "ArrowLeft",
             "modTabsPreviousPage"
         );
+        var tabViewport:Dynamic = HlxRuntime.callResolved(createNewMember, [
+            "flow",
+            tabs,
+            [],
+            { id: "modTabsViewport", layout: "horizontal" }
+        ]);
+        var tabPageWidth = prepareTabPageViewport(tabs, tabViewport);
 
         // This must be the native OptionsContent component, not a generic flow
         // carrying the same CSS classes. Its component identity is what activates
@@ -457,7 +477,8 @@ class BetterModSettingsMod {
             var tabButton:Dynamic = tab == null ? null : HlxRuntime.resolveField(tab, "obj");
             tabButtons.push(tabButton);
             if (tabButton != null) {
-                prepareSettingControl(tabs, tab, false);
+                moveObjectToFlow(tabViewport, tabButton);
+                prepareSettingControl(tabViewport, tab, false);
                 centerFlowContents(tab);
                 tabWidths.push(prepareSingleLineTab(tab, modName));
                 var selectedIndex = index;
@@ -488,25 +509,18 @@ class BetterModSettingsMod {
             }
         }
 
-        var tabPageSpacer:Dynamic = HlxRuntime.callResolved(createNewMember, [
-            "flow",
-            tabs,
-            [],
-            { id: "modTabsPageSpacer", layout: "horizontal" }
-        ]);
-        setFixedFlowWidth(tabPageSpacer, 0);
         var nextPageArrow = createTabPageArrow(
             tabs,
             "ArrowRight",
             "modTabsNextPage"
         );
         configureTabPagination(
-            tabs,
+            tabViewport,
             tabButtons,
             tabWidths,
-            tabPageSpacer,
             previousPageArrow,
-            nextPageArrow
+            nextPageArrow,
+            tabPageWidth
         );
         showPanel(panels, tabButtons, 0);
     }
@@ -1172,6 +1186,94 @@ class BetterModSettingsMod {
         }
     }
 
+    static function prepareTabPageViewport(
+        parentProperties:Dynamic,
+        viewportProperties:Dynamic
+    ):Int {
+        if (parentProperties == null || viewportProperties == null)
+            return 0;
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowAlignType == null)
+                flowAlignType = HlxRuntime.resolveType("h2d.FlowAlign");
+            if (flowOverflowType == null)
+                flowOverflowType = HlxRuntime.resolveType("h2d.FlowOverflow");
+            if (flowType == null)
+                return 0;
+
+            var parent:Dynamic = HlxRuntime.resolveField(parentProperties, "obj");
+            var viewport:Dynamic = HlxRuntime.resolveField(viewportProperties, "obj");
+            if (parent == null || viewport == null)
+                return 0;
+
+            var spacingValue:Dynamic = HlxRuntime.resolveField(
+                parent,
+                "horizontalSpacing"
+            );
+            var spacing = spacingValue == null ? 0 : Std.int(spacingValue);
+            var viewportWidth = 970 - 64 - spacing * 2;
+            if (viewportWidth < 120)
+                viewportWidth = 120;
+
+            setFixedFlowWidth(viewportProperties, viewportWidth);
+            setFlowHorizontalSpacing(viewportProperties, spacing);
+            prepareSettingControl(parentProperties, viewportProperties, false);
+
+            if (setMultilineMember == null)
+                setMultilineMember = HlxRuntime.resolveMember(flowType, "set_multiline");
+            if (setOverflowMember == null)
+                setOverflowMember = HlxRuntime.resolveMember(flowType, "set_overflow");
+            if (setHorizontalAlignMember == null)
+                setHorizontalAlignMember = HlxRuntime.resolveMember(
+                    flowType,
+                    "set_horizontalAlign"
+                );
+
+            if (setMultilineMember != null)
+                HlxRuntime.callResolved(setMultilineMember, [viewport, false]);
+            var hidden:Dynamic = flowOverflowType == null
+                ? null
+                : HlxRuntime.constructEnum(flowOverflowType, "Hidden", []);
+            if (hidden != null && setOverflowMember != null)
+                HlxRuntime.callResolved(setOverflowMember, [viewport, hidden]);
+            var left:Dynamic = flowAlignType == null
+                ? null
+                : HlxRuntime.constructEnum(flowAlignType, "Left", []);
+            if (left != null && setHorizontalAlignMember != null)
+                HlxRuntime.callResolved(setHorizontalAlignMember, [viewport, left]);
+
+            applyInlineStyle(viewportProperties, "multiline", false);
+            if (hidden != null)
+                applyInlineStyle(viewportProperties, "overflow", hidden);
+            if (left != null)
+                applyInlineStyle(viewportProperties, "halign", left);
+            return viewportWidth;
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not prepare tab viewport: " + Std.string(error));
+            return 0;
+        }
+    }
+
+    static function moveObjectToFlow(
+        parentProperties:Dynamic,
+        child:Dynamic
+    ):Void {
+        if (parentProperties == null || child == null)
+            return;
+        try {
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && addChildMember == null)
+                addChildMember = HlxRuntime.resolveMember(h2dObjectType, "addChild");
+            var parent:Dynamic = HlxRuntime.resolveField(parentProperties, "obj");
+            if (parent != null && addChildMember != null)
+                HlxRuntime.callResolved(addChildMember, [parent, child]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not move tab into its viewport: " + Std.string(error));
+        }
+    }
+
     static function setFixedFlowWidth(properties:Dynamic, width:Int):Void {
         if (properties == null)
             return;
@@ -1208,7 +1310,8 @@ class BetterModSettingsMod {
 
     static function buildTabPages(
         tabWidths:Array<Int>,
-        spacing:Int
+        spacing:Int,
+        availableWidth:Int
     ):Array<Array<Int>> {
         var pages:Array<Array<Int>> = [];
         var page:Array<Int> = [];
@@ -1219,12 +1322,10 @@ class BetterModSettingsMod {
             if (width <= 0)
                 continue;
 
-            var candidateCount = page.length + 1;
-            var candidateWidth = 64
-                + pageTabsWidth
-                + width
-                + spacing * (candidateCount + 2);
-            if (page.length > 0 && candidateWidth > 970) {
+            var candidateWidth = pageTabsWidth + width;
+            if (page.length > 0)
+                candidateWidth += spacing * page.length;
+            if (page.length > 0 && candidateWidth > availableWidth) {
                 pages.push(page);
                 page = [];
                 pageTabsWidth = 0;
@@ -1240,13 +1341,10 @@ class BetterModSettingsMod {
     }
 
     static function showTabPage(
-        tabsProperties:Dynamic,
+        viewportProperties:Dynamic,
         tabButtons:Array<Dynamic>,
-        tabWidths:Array<Int>,
-        spacerProperties:Dynamic,
         pages:Array<Array<Int>>,
-        pageIndex:Int,
-        spacing:Int
+        pageIndex:Int
     ):Void {
         if (pageIndex < 0 || pageIndex >= pages.length)
             return;
@@ -1259,50 +1357,47 @@ class BetterModSettingsMod {
                 return;
 
             var page = pages[pageIndex];
-            var visibleTabsWidth = 0;
             for (index in 0...tabButtons.length) {
-                var visible = page.indexOf(index) >= 0;
                 var button = tabButtons[index];
                 if (button != null)
-                    HlxRuntime.callResolved(setVisibleMember, [button, visible]);
-                if (visible && index < tabWidths.length)
-                    visibleTabsWidth += tabWidths[index];
+                    HlxRuntime.callResolved(setVisibleMember, [
+                        button,
+                        page.indexOf(index) >= 0
+                    ]);
             }
-
-            var spacerWidth = 970
-                - 64
-                - visibleTabsWidth
-                - spacing * (page.length + 2);
-            if (spacerWidth < 0)
-                spacerWidth = 0;
-            setFixedFlowWidth(spacerProperties, spacerWidth);
 
             if (flowType == null)
                 flowType = HlxRuntime.resolveType("h2d.Flow");
             if (flowType != null && setNeedReflowMember == null)
                 setNeedReflowMember = HlxRuntime.resolveMember(flowType, "set_needReflow");
-            var tabs:Dynamic = HlxRuntime.resolveField(tabsProperties, "obj");
-            if (tabs != null && setNeedReflowMember != null)
-                HlxRuntime.callResolved(setNeedReflowMember, [tabs, true]);
+            var viewport:Dynamic = HlxRuntime.resolveField(
+                viewportProperties,
+                "obj"
+            );
+            if (viewport != null && setNeedReflowMember != null)
+                HlxRuntime.callResolved(setNeedReflowMember, [viewport, true]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not show tab page: " + Std.string(error));
         }
     }
 
     static function configureTabPagination(
-        tabsProperties:Dynamic,
+        viewportProperties:Dynamic,
         tabButtons:Array<Dynamic>,
-        tabWidths:Array<Int>,
-        spacerProperties:Dynamic,
+        fallbackWidths:Array<Int>,
         previousArrowProperties:Dynamic,
-        nextArrowProperties:Dynamic
+        nextArrowProperties:Dynamic,
+        availableWidth:Int
     ):Void {
-        if (tabsProperties == null || spacerProperties == null
-            || previousArrowProperties == null || nextArrowProperties == null
-            || tabButtons.length == 0)
+        if (viewportProperties == null || previousArrowProperties == null
+            || nextArrowProperties == null || tabButtons.length == 0
+            || availableWidth <= 0)
             return;
         try {
-            var tabs:Dynamic = HlxRuntime.resolveField(tabsProperties, "obj");
+            var viewport:Dynamic = HlxRuntime.resolveField(
+                viewportProperties,
+                "obj"
+            );
             var previousArrow:Dynamic = HlxRuntime.resolveField(
                 previousArrowProperties,
                 "obj"
@@ -1311,19 +1406,75 @@ class BetterModSettingsMod {
                 nextArrowProperties,
                 "obj"
             );
-            if (tabs == null || previousArrow == null || nextArrow == null)
+            if (viewport == null || previousArrow == null || nextArrow == null)
                 return;
 
             var spacingValue:Dynamic = HlxRuntime.resolveField(
-                tabs,
+                viewport,
                 "horizontalSpacing"
             );
-            var spacing = spacingValue == null ? 0 : Std.int(spacingValue);
-            var pages = buildTabPages(tabWidths, spacing);
+            pendingTabViewportProperties = viewportProperties;
+            pendingTabButtons = tabButtons;
+            pendingTabFallbackWidths = fallbackWidths;
+            pendingTabPreviousArrow = previousArrow;
+            pendingTabNextArrow = nextArrow;
+            pendingTabPageWidth = availableWidth;
+            pendingTabSpacing = spacingValue == null ? 0 : Std.int(spacingValue);
+            // Wait for the native stylesheet and the tab label no-wrap pass to
+            // finish, then paginate using the buttons' rendered outer widths.
+            tabPaginationFramesRemaining = 4;
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not queue tab pagination: " + Std.string(error));
+        }
+    }
+
+    static function refreshPendingTabPagination():Void {
+        if (tabPaginationFramesRemaining <= 0)
+            return;
+        tabPaginationFramesRemaining--;
+        if (tabPaginationFramesRemaining > 0)
+            return;
+
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType != null && getOuterWidthMember == null)
+                getOuterWidthMember = HlxRuntime.resolveMember(
+                    flowType,
+                    "get_outerWidth"
+                );
+
+            var measuredWidths:Array<Int> = [];
+            for (index in 0...pendingTabButtons.length) {
+                var width = index < pendingTabFallbackWidths.length
+                    ? pendingTabFallbackWidths[index]
+                    : 120;
+                var button = pendingTabButtons[index];
+                if (button != null && getOuterWidthMember != null) {
+                    var measured:Dynamic = HlxRuntime.callResolved(
+                        getOuterWidthMember,
+                        [button]
+                    );
+                    if (measured != null && Std.int(measured) > 0)
+                        width = Std.int(measured);
+                }
+                measuredWidths.push(width);
+            }
+
+            var pages = buildTabPages(
+                measuredWidths,
+                pendingTabSpacing,
+                pendingTabPageWidth
+            );
             if (pages.length == 0)
                 return;
 
+            var viewportProperties = pendingTabViewportProperties;
+            var tabButtons = pendingTabButtons;
+            var previousArrow = pendingTabPreviousArrow;
+            var nextArrow = pendingTabNextArrow;
             var currentPage = 0;
+
             HlxRuntime.callResolved(setOnClickMember, [
                 previousArrow,
                 function():Void {
@@ -1331,13 +1482,10 @@ class BetterModSettingsMod {
                         return;
                     currentPage--;
                     showTabPage(
-                        tabsProperties,
+                        viewportProperties,
                         tabButtons,
-                        tabWidths,
-                        spacerProperties,
                         pages,
-                        currentPage,
-                        spacing
+                        currentPage
                     );
                 }
             ]);
@@ -1348,28 +1496,25 @@ class BetterModSettingsMod {
                         return;
                     currentPage++;
                     showTabPage(
-                        tabsProperties,
+                        viewportProperties,
                         tabButtons,
-                        tabWidths,
-                        spacerProperties,
                         pages,
-                        currentPage,
-                        spacing
+                        currentPage
                     );
                 }
             ]);
-            showTabPage(
-                tabsProperties,
-                tabButtons,
-                tabWidths,
-                spacerProperties,
-                pages,
-                currentPage,
-                spacing
-            );
+            showTabPage(viewportProperties, tabButtons, pages, currentPage);
         } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not configure tab pagination: " + Std.string(error));
+            trace("[BetterModSettings] Could not finalize tab pagination: " + Std.string(error));
         }
+
+        pendingTabViewportProperties = null;
+        pendingTabButtons = [];
+        pendingTabFallbackWidths = [];
+        pendingTabPreviousArrow = null;
+        pendingTabNextArrow = null;
+        pendingTabPageWidth = 0;
+        pendingTabSpacing = 0;
     }
 
     static function setFlowHorizontalSpacing(properties:Dynamic, spacing:Int):Void {
