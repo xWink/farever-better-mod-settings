@@ -40,6 +40,7 @@ class BetterModSettingsMod {
     static var isKeyPressedMember:hlx.runtime.ResolvedMember;
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
+    static var addChildAtMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -176,12 +177,21 @@ class BetterModSettingsMod {
             if (windowObject == null)
                 return;
             HlxRuntime.setField(windowProperties, "contentRoot", windowObject);
-            HlxRuntime.callResolved(createNewMember, [
+            var titleProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "text",
                 windowProperties,
                 ["Mod Settings"],
                 { id: "title" }
             ]);
+            var titleObject:Dynamic = titleProperties == null
+                ? null
+                : HlxRuntime.resolveField(titleProperties, "obj");
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && addChildAtMember == null)
+                addChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "addChildAt");
+            if (titleObject != null && addChildAtMember != null)
+                HlxRuntime.callResolved(addChildAtMember, [windowObject, titleObject, 0]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not create native window title: " + Std.string(error));
         }
@@ -247,9 +257,9 @@ class BetterModSettingsMod {
             if (setMaxWidthMember != null)
                 HlxRuntime.callResolved(setMaxWidthMember, [body, 900]);
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [body, 420]);
+                HlxRuntime.callResolved(setMinHeightMember, [body, 460]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [body, 420]);
+                HlxRuntime.callResolved(setMaxHeightMember, [body, 460]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings body: " + Std.string(error));
         }
