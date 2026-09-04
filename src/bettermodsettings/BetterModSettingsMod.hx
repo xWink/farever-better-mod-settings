@@ -497,17 +497,18 @@ class BetterModSettingsMod {
             };
 
             var panelProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "block", settingsParentProperties, [], panelAttributes
+                "flow", settingsParentProperties, [], panelAttributes
             ]);
             var panel:Dynamic = panelProperties == null
                 ? null
                 : HlxRuntime.resolveField(panelProperties, "obj");
             panels.push(panel);
             if (panelProperties != null) {
-                styleFlow(panelProperties, 24, 24, 0);
-                setHorizontalPadding(panelProperties, 100);
-                setPersistentPanelLayout(panelProperties, 100, 34, 24);
-                sizeSettingsPanel(panelProperties);
+                // The native Options container already supplies the body
+                // background, viewport size, and content insets. Keep each
+                // switchable mod panel transparent and add only row spacing.
+                styleFlow(panelProperties, 0, 24, 0);
+                setPersistentPanelLayout(panelProperties, 0, 0, 24);
                 buildModSettings(panelProperties, mod);
             }
         }
@@ -527,38 +528,6 @@ class BetterModSettingsMod {
             tabPageWidth
         );
         showPanel(panels, tabButtons, 0);
-    }
-
-    static function sizeSettingsPanel(panelProperties:Dynamic):Void {
-        try {
-            if (flowType == null)
-                flowType = HlxRuntime.resolveType("h2d.Flow");
-            if (flowType == null)
-                return;
-            if (setMinHeightMember == null)
-                setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
-            if (setMaxHeightMember == null)
-                setMaxHeightMember = HlxRuntime.resolveMember(flowType, "set_maxHeight");
-            var panel:Dynamic = HlxRuntime.resolveField(panelProperties, "obj");
-            if (panel == null)
-                return;
-            if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [panel, 520]);
-            if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [panel, 520]);
-
-            if (propertiesType == null)
-                propertiesType = HlxRuntime.resolveType("domkit.Properties");
-            if (propertiesType != null && initStyleMember == null)
-                initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
-            if (initStyleMember != null) {
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "height", 520]);
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "min-height", 520]);
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "max-height", 520]);
-            }
-        } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not size settings panel: " + Std.string(error));
-        }
     }
 
     static function prepareNativeOptionsBody(bodyProperties:Dynamic):Dynamic {
