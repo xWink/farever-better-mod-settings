@@ -382,25 +382,29 @@ class BetterModSettingsMod {
             var optionsList:Dynamic = HlxRuntime.resolveField(body, "optionsList");
             if (optionsList == null)
                 return bodyProperties;
-            // setList([]) cannot safely cross the reflective boundary because
-            // OptionsList expects a concrete game array type. Hide the rows it
-            // already created instead, then reuse its native Block.
-            var nativeLines:Array<Dynamic> = cast HlxRuntime.resolveField(optionsList, "lines");
-            if (nativeLines != null && setVisibleMember != null) {
-                for (line in nativeLines) {
-                    if (line != null)
-                        HlxRuntime.callResolved(setVisibleMember, [line, false]);
-                }
-            }
+            // HashLink keeps OptionsList.lines as ArrayObj, which cannot be
+            // safely iterated as Haxe Array<Dynamic>. Hide the generated Block
+            // wholesale and create our own native Block under the same OptionsList.
+            var nativeContainer:Dynamic = HlxRuntime.resolveField(optionsList, "container");
+            if (nativeContainer != null && setVisibleMember != null)
+                HlxRuntime.callResolved(setVisibleMember, [nativeContainer, false]);
+
             var applyButton:Dynamic = HlxRuntime.resolveField(optionsList, "applyBtn");
             if (applyButton != null && setVisibleMember != null)
                 HlxRuntime.callResolved(setVisibleMember, [applyButton, false]);
 
-            var container:Dynamic = HlxRuntime.resolveField(optionsList, "container");
-            if (container == null)
+            var optionsListProperties:Dynamic = HlxRuntime.resolveField(optionsList, "dom");
+            if (optionsListProperties == null)
                 return bodyProperties;
-            var containerProperties:Dynamic = HlxRuntime.resolveField(container, "dom");
-            return containerProperties == null ? bodyProperties : containerProperties;
+            var modContainerProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+                "block",
+                optionsListProperties,
+                [],
+                { id: "modSettingsOptionsContainer" }
+            ]);
+            return modContainerProperties == null
+                ? bodyProperties
+                : modContainerProperties;
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not prepare native options body: " + Std.string(error));
             return bodyProperties;
