@@ -1,17 +1,22 @@
 package bettermodsettings;
 
 import haxe.Json;
+import hlx.runtime.Bus;
 import hlx.runtime.HlxPrefixResult;
 import sys.FileSystem;
 import sys.io.File;
 
 @:build(hlx.runtime.Mod.build())
 class BetterModSettingsMod {
+    static inline var SETTINGS_CHANGED_TOPIC_PREFIX =
+        "better-mod-settings/config-changed/";
+
     static var activeEscapeMenu:Dynamic;
     static var modSettingsButton:Dynamic;
     static var nativeSettingsWindow:Dynamic;
     static var openingNativeSettingsWindow:Bool = false;
     static var compatibleMods:Array<Dynamic> = [];
+    static var pendingSettingsNotifications:Map<String, Bool> = new Map();
     static var capturingKeybind:Dynamic;
     static var nativeOptionLabelStyle:Dynamic;
     static var pendingOptionLabels:Array<Dynamic> = [];
@@ -89,6 +94,7 @@ class BetterModSettingsMod {
         capturePressedKey();
         refreshPendingOptionLabelStyles();
         refreshPendingTabPagination();
+        flushSettingsNotifications();
     }
 
     @:hlx.prefix(ui.win.BaseWindow.closeSelfOnOpen)
@@ -388,6 +394,7 @@ class BetterModSettingsMod {
                     if (definitions == null)
                         continue;
                     compatibleMods.push({
+                        id: folder,
                         name: stringField(format, "displayName", folder),
                         settingsPath: settingsPath,
                         definitions: definitions,
@@ -1927,8 +1934,29 @@ class BetterModSettingsMod {
                 settingsPath,
                 Json.stringify(values, null, "  ")
             );
+            queueSettingsNotification(mod);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not save " + key + ": " + Std.string(error));
+        }
+    }
+
+    static function queueSettingsNotification(mod:Dynamic):Void {
+        var modId = stringField(mod, "id", "");
+        if (modId.length > 0)
+            pendingSettingsNotifications.set(modId, true);
+    }
+
+    static function flushSettingsNotifications():Void {
+        var notifications = pendingSettingsNotifications;
+        pendingSettingsNotifications = new Map();
+
+        for (modId in notifications.keys()) {
+            try {
+                Bus.publish(SETTINGS_CHANGED_TOPIC_PREFIX + modId, null);
+            } catch (error:Dynamic) {
+                trace("[BetterModSettings] Could not notify " + modId
+                    + " of a settings change: " + Std.string(error));
+            }
         }
     }
 
