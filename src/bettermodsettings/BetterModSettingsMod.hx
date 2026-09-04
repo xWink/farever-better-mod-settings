@@ -11,13 +11,13 @@ class BetterModSettingsMod {
     static var nativeSettingsWindow:Dynamic;
     static var compatibleMods:Array<Dynamic> = [];
     static var capturingKeybind:Dynamic;
+    static var nativeOptionLabelStyle:Dynamic;
 
     static var propertiesType:hl.Bytes;
     static var uiElementType:hl.Bytes;
     static var h2dObjectType:hl.Bytes;
     static var titleWindowType:hl.Bytes;
     static var flowType:hl.Bytes;
-    static var flowPropertiesType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
@@ -42,8 +42,11 @@ class BetterModSettingsMod {
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
     static var initStyleMember:hlx.runtime.ResolvedMember;
-    static var getFlowPropertiesMember:hlx.runtime.ResolvedMember;
-    static var setFlowAbsoluteMember:hlx.runtime.ResolvedMember;
+    static var getObjectByNameMember:hlx.runtime.ResolvedMember;
+    static var getChildAtMember:hlx.runtime.ResolvedMember;
+    static var getNumChildrenMember:hlx.runtime.ResolvedMember;
+    static var setFontMember:hlx.runtime.ResolvedMember;
+    static var setTextColorMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -128,7 +131,7 @@ class BetterModSettingsMod {
             nativeSettingsWindow = HlxRuntime.constructInstanceByName(
                 titleWindowType,
                 2,
-                ["Mod Settings", parent]
+                ["Options", parent]
             );
             if (nativeSettingsWindow == null) {
                 trace("[BetterModSettings] Native Mod Settings window creation returned null");
@@ -170,53 +173,34 @@ class BetterModSettingsMod {
     }
 
     static function setNativeWindowTitle(windowProperties:Dynamic):Void {
-        var originalContentRoot:Dynamic = null;
         try {
-            originalContentRoot = HlxRuntime.resolveField(windowProperties, "contentRoot");
             var windowObject:Dynamic = HlxRuntime.resolveField(windowProperties, "obj");
             if (windowObject == null)
                 return;
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && getObjectByNameMember == null)
+                getObjectByNameMember = HlxRuntime.resolveMember(h2dObjectType, "getObjectByName");
+            if (getObjectByNameMember == null)
+                return;
 
-            // Create #title as a real direct child of TitleWindow, then mark it
-            // absolute through FlowProperties. Unlike addChildAt, this never
-            // reparents a DOMKit-managed object after creation.
-            HlxRuntime.setField(windowProperties, "contentRoot", windowObject);
-            var titleProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "text",
-                windowProperties,
-                ["Mod Settings"],
-                { id: "title" }
-            ]);
-            var titleObject:Dynamic = titleProperties == null
-                ? null
-                : HlxRuntime.resolveField(titleProperties, "obj");
-
-            if (flowType == null)
-                flowType = HlxRuntime.resolveType("h2d.Flow");
-            if (flowType != null && getFlowPropertiesMember == null)
-                getFlowPropertiesMember = HlxRuntime.resolveMember(flowType, "getProperties");
-            if (flowPropertiesType == null)
-                flowPropertiesType = HlxRuntime.resolveType("h2d.FlowProperties");
-            if (flowPropertiesType != null && setFlowAbsoluteMember == null)
-                setFlowAbsoluteMember = HlxRuntime.resolveMember(flowPropertiesType, "set_isAbsolute");
-            if (titleObject != null && getFlowPropertiesMember != null
-                && setFlowAbsoluteMember != null) {
-                var flowProperties:Dynamic = HlxRuntime.callResolved(
-                    getFlowPropertiesMember,
-                    [windowObject, titleObject]
-                );
-                if (flowProperties != null)
-                    HlxRuntime.callResolved(setFlowAbsoluteMember, [flowProperties, true]);
-            }
+            // TitleWindow created this node from the valid "Options"
+            // localization key. Change only its displayed text; its native
+            // parent, alignment, font and title-bar position remain untouched.
+            var titleObject:Dynamic = HlxRuntime.callResolved(
+                getObjectByNameMember,
+                [windowObject, "title"]
+            );
+            if (titleObject == null)
+                return;
+            if (textType == null)
+                textType = HlxRuntime.resolveType("h2d.Text");
+            if (textType != null && setTitleTextMember == null)
+                setTitleTextMember = HlxRuntime.resolveMember(textType, "set_text");
+            if (setTitleTextMember != null)
+                HlxRuntime.callResolved(setTitleTextMember, [titleObject, "Mod Settings"]);
         } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not create native window title: " + Std.string(error));
-        }
-        if (originalContentRoot != null) {
-            try {
-                HlxRuntime.setField(windowProperties, "contentRoot", originalContentRoot);
-            } catch (error:Dynamic) {
-                trace("[BetterModSettings] Could not restore window content root: " + Std.string(error));
-            }
+            trace("[BetterModSettings] Could not update native window title: " + Std.string(error));
         }
     }
 
@@ -467,6 +451,7 @@ class BetterModSettingsMod {
             // safely iterated as Haxe Array<Dynamic>. Hide the generated Block
             // wholesale and create our own native Block under the same OptionsList.
             var nativeContainer:Dynamic = HlxRuntime.resolveField(optionsList, "container");
+            nativeOptionLabelStyle = findFirstTextObject(nativeContainer, 4);
             if (nativeContainer != null && setVisibleMember != null)
                 HlxRuntime.callResolved(setVisibleMember, [nativeContainer, false]);
 
@@ -584,6 +569,70 @@ class BetterModSettingsMod {
         }
     }
 
+    static function findFirstTextObject(root:Dynamic, depth:Int):Dynamic {
+        if (root == null || depth < 0)
+            return null;
+        try {
+            var font:Dynamic = HlxRuntime.resolveField(root, "font");
+            if (font != null)
+                return root;
+        } catch (_:Dynamic) {}
+
+        try {
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && getChildAtMember == null)
+                getChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "getChildAt");
+            if (h2dObjectType != null && getNumChildrenMember == null)
+                getNumChildrenMember = HlxRuntime.resolveMember(h2dObjectType, "get_numChildren");
+            if (getChildAtMember == null || getNumChildrenMember == null)
+                return null;
+            var count:Int = cast HlxRuntime.callResolved(getNumChildrenMember, [root]);
+            for (index in 0...count) {
+                var child:Dynamic = HlxRuntime.callResolved(getChildAtMember, [root, index]);
+                var found = findFirstTextObject(child, depth - 1);
+                if (found != null)
+                    return found;
+            }
+        } catch (_:Dynamic) {}
+        return null;
+    }
+
+    static function applyNativeOptionLabelStyle(line:Dynamic):Void {
+        if (line == null || nativeOptionLabelStyle == null)
+            return;
+        try {
+            var label = findFirstTextObject(line, 4);
+            if (label == null)
+                return;
+            if (textType == null)
+                textType = HlxRuntime.resolveType("h2d.Text");
+            if (textType == null)
+                return;
+            if (setFontMember == null)
+                setFontMember = HlxRuntime.resolveMember(textType, "set_font");
+            if (setTextColorMember == null)
+                setTextColorMember = HlxRuntime.resolveMember(textType, "set_textColor");
+
+            var font:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "font");
+            var color:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, "textColor");
+            if (font != null && setFontMember != null)
+                HlxRuntime.callResolved(setFontMember, [label, font]);
+            if (color != null && setTextColorMember != null)
+                HlxRuntime.callResolved(setTextColorMember, [label, color]);
+
+            for (field in ["scaleX", "scaleY", "letterSpacing", "lineSpacing"]) {
+                try {
+                    var value:Dynamic = HlxRuntime.resolveField(nativeOptionLabelStyle, field);
+                    if (value != null)
+                        HlxRuntime.setField(label, field, value);
+                } catch (_:Dynamic) {}
+            }
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not apply native option label style: " + Std.string(error));
+        }
+    }
+
     static function createOptionRow(
         parentProperties:Dynamic,
         label:String,
@@ -605,6 +654,7 @@ class BetterModSettingsMod {
                 return parentProperties;
             setFlowHorizontalSpacing(lineProperties, 12);
             var line:Dynamic = HlxRuntime.resolveField(lineProperties, "obj");
+            applyNativeOptionLabelStyle(line);
             var container:Dynamic = line == null ? null : HlxRuntime.resolveField(line, "container");
             var containerProperties:Dynamic = container == null
                 ? null
