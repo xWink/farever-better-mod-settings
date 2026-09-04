@@ -1438,11 +1438,12 @@ class BetterModSettingsMod {
             for (index in 0...tabButtons.length) {
                 var button = tabButtons[index];
                 if (button != null) {
+                    var visible = page.indexOf(index) >= 0;
                     // Tabs inherit per-child alignment and padding from the
                     // native .tabs rule. Those values override the viewport's
                     // alignment and cause each page to redistribute its tabs.
-                    // Normalize the actual FlowProperties so only the
-                    // viewport's fixed hspacing controls their positions.
+                    // Make each tab absolute, anchor it to the left, and give
+                    // it an explicit cumulative offset that Flow will preserve.
                     if (flowType != null && getFlowPropertiesMember == null)
                         getFlowPropertiesMember = HlxRuntime.resolveMember(
                             flowType,
@@ -1455,10 +1456,18 @@ class BetterModSettingsMod {
                             [viewport, button]
                         );
                     if (tabFlowProperties != null) {
-                        HlxRuntime.setField(tabFlowProperties, "horizontalAlign", null);
+                        HlxRuntime.setField(
+                            tabFlowProperties,
+                            "horizontalAlign",
+                            left
+                        );
                         HlxRuntime.setField(tabFlowProperties, "paddingLeft", 0);
                         HlxRuntime.setField(tabFlowProperties, "paddingRight", 0);
-                        HlxRuntime.setField(tabFlowProperties, "offsetX", 0);
+                        HlxRuntime.setField(
+                            tabFlowProperties,
+                            "offsetX",
+                            visible ? tabX : 0
+                        );
                         HlxRuntime.setField(tabFlowProperties, "lineBreak", false);
                         HlxRuntime.setField(tabFlowProperties, "autoSizeWidth", null);
                         if (setFlowPropertyAbsoluteMember != null)
@@ -1473,13 +1482,11 @@ class BetterModSettingsMod {
                                 true
                             );
                     }
-                    var visible = page.indexOf(index) >= 0;
                     HlxRuntime.callResolved(setVisibleMember, [
                         button,
                         visible
                     ]);
                     if (visible) {
-                        HlxRuntime.setField(button, "x", tabX * 1.0);
                         if (index < tabWidths.length)
                             tabX += tabWidths[index] + 20;
                     }
