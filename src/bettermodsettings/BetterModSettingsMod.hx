@@ -19,6 +19,7 @@ class BetterModSettingsMod {
     static var labelStyleFramesRemaining:Int = 0;
 
     static var propertiesType:hl.Bytes;
+    static var componentType:hl.Bytes;
     static var uiElementType:hl.Bytes;
     static var h2dObjectType:hl.Bytes;
     static var titleWindowType:hl.Bytes;
@@ -30,6 +31,7 @@ class BetterModSettingsMod {
     static var textType:hl.Bytes;
     static var hxdKeyType:hl.Bytes;
     static var createNewMember:hlx.runtime.ResolvedMember;
+    static var getComponentMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
     static var setOnClickMember:hlx.runtime.ResolvedMember;
     static var setMinWidthMember:hlx.runtime.ResolvedMember;
@@ -171,6 +173,7 @@ class BetterModSettingsMod {
                 return;
             }
 
+            applyNativeOptionsWindowComponent(windowProperties);
             setNativeWindowTitle(windowProperties);
             pendingOptionLabels = [];
             pendingOptionRows = [];
@@ -200,6 +203,29 @@ class BetterModSettingsMod {
             openingNativeSettingsWindow = false;
             nativeSettingsWindow = null;
             trace("[BetterModSettings] Could not open native settings window: " + Std.string(error));
+        }
+    }
+
+    static function applyNativeOptionsWindowComponent(windowProperties:Dynamic):Void {
+        try {
+            if (componentType == null)
+                componentType = HlxRuntime.resolveType("domkit.Component");
+            if (componentType != null && getComponentMember == null)
+                getComponentMember = HlxRuntime.resolveStaticMember(componentType, "get");
+            if (getComponentMember == null)
+                return;
+
+            // Native Options is positioned as a companion to EscapeMenu by the
+            // options-window component's top-level style. The bare TitleWindow
+            // component is centered independently and therefore overlaps it.
+            var optionsComponent:Dynamic = HlxRuntime.callResolved(
+                getComponentMember,
+                ["options-window", null]
+            );
+            if (optionsComponent != null)
+                HlxRuntime.setField(windowProperties, "component", optionsComponent);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not apply native Options window layout: " + Std.string(error));
         }
     }
 
@@ -276,11 +302,11 @@ class BetterModSettingsMod {
             if (setMinWidthMember != null)
                 HlxRuntime.callResolved(setMinWidthMember, [content, 970]);
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [content, 540]);
+                HlxRuntime.callResolved(setMinHeightMember, [content, 580]);
             if (setMaxWidthMember != null)
                 HlxRuntime.callResolved(setMaxWidthMember, [content, 970]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [content, 540]);
+                HlxRuntime.callResolved(setMaxHeightMember, [content, 580]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size native window: " + Std.string(error));
         }
@@ -308,9 +334,9 @@ class BetterModSettingsMod {
             if (setMaxWidthMember != null)
                 HlxRuntime.callResolved(setMaxWidthMember, [body, 970]);
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [body, 460]);
+                HlxRuntime.callResolved(setMinHeightMember, [body, 500]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [body, 460]);
+                HlxRuntime.callResolved(setMaxHeightMember, [body, 500]);
 
             // Flow dimensions are later overwritten by DOMKit's component CSS.
             // Inline styles participate in that same cascade and survive reflow.
@@ -319,9 +345,9 @@ class BetterModSettingsMod {
             if (propertiesType != null && initStyleMember == null)
                 initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
             if (initStyleMember != null) {
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "height", 460]);
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-height", 460]);
-                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-height", 460]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-height", 500]);
             }
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings body: " + Std.string(error));
@@ -461,18 +487,18 @@ class BetterModSettingsMod {
             if (panel == null)
                 return;
             if (setMinHeightMember != null)
-                HlxRuntime.callResolved(setMinHeightMember, [panel, 460]);
+                HlxRuntime.callResolved(setMinHeightMember, [panel, 500]);
             if (setMaxHeightMember != null)
-                HlxRuntime.callResolved(setMaxHeightMember, [panel, 460]);
+                HlxRuntime.callResolved(setMaxHeightMember, [panel, 500]);
 
             if (propertiesType == null)
                 propertiesType = HlxRuntime.resolveType("domkit.Properties");
             if (propertiesType != null && initStyleMember == null)
                 initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
             if (initStyleMember != null) {
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "height", 460]);
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "min-height", 460]);
-                HlxRuntime.callResolved(initStyleMember, [panelProperties, "max-height", 460]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "min-height", 500]);
+                HlxRuntime.callResolved(initStyleMember, [panelProperties, "max-height", 500]);
             }
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings panel: " + Std.string(error));
