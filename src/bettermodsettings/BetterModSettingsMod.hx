@@ -33,7 +33,6 @@ class BetterModSettingsMod {
     static var createNewMember:hlx.runtime.ResolvedMember;
     static var getComponentMember:hlx.runtime.ResolvedMember;
     static var getParentPropertiesMember:hlx.runtime.ResolvedMember;
-    static var hasClassMember:hlx.runtime.ResolvedMember;
     static var setOnClickMember:hlx.runtime.ResolvedMember;
     static var setMinWidthMember:hlx.runtime.ResolvedMember;
     static var setMinHeightMember:hlx.runtime.ResolvedMember;
@@ -238,58 +237,6 @@ class BetterModSettingsMod {
         }
     }
 
-    static function findPropertiesWithClass(
-        object:Dynamic,
-        className:String,
-        depth:Int
-    ):Dynamic {
-        if (object == null || depth < 0)
-            return null;
-        try {
-            if (h2dObjectType == null)
-                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
-            if (propertiesType == null)
-                propertiesType = HlxRuntime.resolveType("domkit.Properties");
-            if (h2dObjectType == null || propertiesType == null)
-                return null;
-
-            if (getChildAtMember == null)
-                getChildAtMember = HlxRuntime.resolveMember(h2dObjectType, "getChildAt");
-            if (getNumChildrenMember == null)
-                getNumChildrenMember = HlxRuntime.resolveMember(h2dObjectType, "get_numChildren");
-            if (hasClassMember == null)
-                hasClassMember = HlxRuntime.resolveMember(propertiesType, "hasClass");
-
-            var objectProperties:Dynamic = HlxRuntime.resolveField(object, "dom");
-            if (objectProperties != null && hasClassMember != null) {
-                var matches:Bool = HlxRuntime.callResolved(
-                    hasClassMember,
-                    [objectProperties, className]
-                );
-                if (matches)
-                    return objectProperties;
-            }
-
-            if (getChildAtMember == null || getNumChildrenMember == null)
-                return null;
-            var childCount:Int = HlxRuntime.callResolved(getNumChildrenMember, [object]);
-            for (index in 0...childCount) {
-                var child:Dynamic = HlxRuntime.callResolved(
-                    getChildAtMember,
-                    [object, index]
-                );
-                var found:Dynamic = findPropertiesWithClass(
-                    child,
-                    className,
-                    depth - 1
-                );
-                if (found != null)
-                    return found;
-            }
-        } catch (_:Dynamic) {}
-        return null;
-    }
-
     static function displayNativeSettingsWindow():Void {
         try {
             if (baseUIType == null)
@@ -442,21 +389,10 @@ class BetterModSettingsMod {
             return;
         }
 
-        var windowObject:Dynamic = HlxRuntime.resolveField(windowProperties, "obj");
-        var nativeHeaderProperties:Dynamic = findPropertiesWithClass(
-            windowObject,
-            "title-window-content",
-            3
-        );
-        if (nativeHeaderProperties == null) {
-            trace("[BetterModSettings] Native tab header was not found");
-            return;
-        }
-
         var tabsAttributes:Dynamic = { id: "modTabs" };
         Reflect.setField(tabsAttributes, "class", "tabs");
         var tabs:Dynamic = HlxRuntime.callResolved(createNewMember, [
-            "element", nativeHeaderProperties, [], tabsAttributes
+            "element", windowProperties, [], tabsAttributes
         ]);
         if (tabs == null)
             return;
