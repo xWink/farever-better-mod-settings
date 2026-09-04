@@ -40,6 +40,7 @@ class BetterModSettingsMod {
     static var isKeyPressedMember:hlx.runtime.ResolvedMember;
     static var getKeyNameMember:hlx.runtime.ResolvedMember;
     static var setVisibleMember:hlx.runtime.ResolvedMember;
+    static var initStyleMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -166,16 +167,10 @@ class BetterModSettingsMod {
     }
 
     static function setNativeWindowTitle(windowProperties:Dynamic):Void {
-        var originalContentRoot:Dynamic = null;
         try {
-            // Properties.createNew normally redirects children into
-            // title-window-content. Temporarily target the window object itself
-            // so #title is a direct TitleWindow child, matching the native DOM.
-            originalContentRoot = HlxRuntime.resolveField(windowProperties, "contentRoot");
-            var windowObject:Dynamic = HlxRuntime.resolveField(windowProperties, "obj");
-            if (windowObject == null)
-                return;
-            HlxRuntime.setField(windowProperties, "contentRoot", windowObject);
+            // TitleWindow routes normal children into title-window-content.
+            // Creating this first makes it precede the tab strip without
+            // desynchronizing DOMKit through raw scene-graph reparenting.
             HlxRuntime.callResolved(createNewMember, [
                 "text",
                 windowProperties,
@@ -184,13 +179,6 @@ class BetterModSettingsMod {
             ]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not create native window title: " + Std.string(error));
-        }
-        if (originalContentRoot != null) {
-            try {
-                HlxRuntime.setField(windowProperties, "contentRoot", originalContentRoot);
-            } catch (error:Dynamic) {
-                trace("[BetterModSettings] Could not restore window content root: " + Std.string(error));
-            }
         }
     }
 
@@ -250,6 +238,18 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(setMinHeightMember, [body, 460]);
             if (setMaxHeightMember != null)
                 HlxRuntime.callResolved(setMaxHeightMember, [body, 460]);
+
+            // Flow dimensions are later overwritten by DOMKit's component CSS.
+            // Inline styles participate in that same cascade and survive reflow.
+            if (propertiesType == null)
+                propertiesType = HlxRuntime.resolveType("domkit.Properties");
+            if (propertiesType != null && initStyleMember == null)
+                initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
+            if (initStyleMember != null) {
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "height", 460]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "min-height", 460]);
+                HlxRuntime.callResolved(initStyleMember, [bodyProperties, "max-height", 460]);
+            }
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size settings body: " + Std.string(error));
         }
