@@ -143,7 +143,7 @@ class BetterModSettingsMod {
                 id: "betterModSettingsContent",
                 layout: "vertical"
             };
-            Reflect.setField(contentAttributes, "class", "options-content in-option-group");
+
             var contentProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
                 "flow",
                 windowProperties,
@@ -154,8 +154,7 @@ class BetterModSettingsMod {
                 return;
 
             sizeContent(contentProperties);
-            styleFlow(contentProperties, 24, 18, 0);
-            setHorizontalPadding(contentProperties, 64);
+            styleFlow(contentProperties, 0, 18, 0);
             discoverCompatibleMods();
             buildSettingsContent(contentProperties);
 
@@ -213,6 +212,36 @@ class BetterModSettingsMod {
                 HlxRuntime.callResolved(setMaxHeightMember, [content, 540]);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not size native window: " + Std.string(error));
+        }
+    }
+
+    static function sizeBody(bodyProperties:Dynamic):Void {
+        try {
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType == null)
+                return;
+            if (setMinWidthMember == null)
+                setMinWidthMember = HlxRuntime.resolveMember(flowType, "set_minWidth");
+            if (setMaxWidthMember == null)
+                setMaxWidthMember = HlxRuntime.resolveMember(flowType, "set_maxWidth");
+            if (setMinHeightMember == null)
+                setMinHeightMember = HlxRuntime.resolveMember(flowType, "set_minHeight");
+            if (setMaxHeightMember == null)
+                setMaxHeightMember = HlxRuntime.resolveMember(flowType, "set_maxHeight");
+            var body:Dynamic = HlxRuntime.resolveField(bodyProperties, "obj");
+            if (body == null)
+                return;
+            if (setMinWidthMember != null)
+                HlxRuntime.callResolved(setMinWidthMember, [body, 900]);
+            if (setMaxWidthMember != null)
+                HlxRuntime.callResolved(setMaxWidthMember, [body, 900]);
+            if (setMinHeightMember != null)
+                HlxRuntime.callResolved(setMinHeightMember, [body, 420]);
+            if (setMaxHeightMember != null)
+                HlxRuntime.callResolved(setMaxHeightMember, [body, 420]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not size settings body: " + Std.string(error));
         }
     }
 
@@ -278,6 +307,23 @@ class BetterModSettingsMod {
             "flow", contentProperties, [], tabsAttributes
         ]);
         styleFlow(tabs, 0, 0, 10);
+        setHorizontalPadding(tabs, 64);
+
+        var bodyAttributes:Dynamic = {
+            id: "modSettingsBody",
+            layout: "vertical"
+        };
+        Reflect.setField(
+            bodyAttributes,
+            "class",
+            "options-content content in-option-group"
+        );
+        var bodyProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
+            "flow", contentProperties, [], bodyAttributes
+        ]);
+        if (bodyProperties == null)
+            bodyProperties = contentProperties;
+        sizeBody(bodyProperties);
 
         var panels:Array<Dynamic> = [];
         var tabButtons:Array<Dynamic> = [];
@@ -302,9 +348,9 @@ class BetterModSettingsMod {
                 id: "modPanel" + index,
                 layout: "vertical"
             };
-            Reflect.setField(panelAttributes, "class", "content in-option-group");
+
             var panelProperties:Dynamic = HlxRuntime.callResolved(createNewMember, [
-                "flow", contentProperties, [], panelAttributes
+                "flow", bodyProperties, [], panelAttributes
             ]);
             var panel:Dynamic = panelProperties == null
                 ? null
@@ -312,6 +358,7 @@ class BetterModSettingsMod {
             panels.push(panel);
             if (panelProperties != null) {
                 styleFlow(panelProperties, 4, 14, 0);
+                setHorizontalPadding(panelProperties, 64);
                 buildModSettings(panelProperties, mod);
             }
         }
