@@ -62,7 +62,6 @@ class BetterModSettingsMod {
     static function afterEscapeMenuInit(instance:Dynamic, result:Void):Void {
         activeEscapeMenu = instance;
         modSettingsButton = null;
-        trace("[BetterModSettings] Escape menu init detected");
 
         try {
             if (!resolveUiMembers()) {
@@ -106,7 +105,6 @@ class BetterModSettingsMod {
             }
 
             HlxRuntime.callResolved(setOnClickMember, [modSettingsButton, openSettings]);
-            trace("[BetterModSettings] Mod Settings button appended successfully");
         } catch (error:Dynamic) {
             modSettingsButton = null;
             trace("[BetterModSettings] Could not add Escape menu button: " + Std.string(error));
@@ -170,7 +168,6 @@ class BetterModSettingsMod {
             discoverCompatibleMods();
             buildSettingsContent(contentProperties);
 
-            trace("[BetterModSettings] Native Mod Settings window opened");
         } catch (error:Dynamic) {
             nativeSettingsWindow = null;
             trace("[BetterModSettings] Could not open native settings window: " + Std.string(error));
@@ -318,7 +315,6 @@ class BetterModSettingsMod {
                 var right = Std.string(Reflect.field(b, "name")).toLowerCase();
                 return left < right ? -1 : (left > right ? 1 : 0);
             });
-            trace("[BetterModSettings] Found " + compatibleMods.length + " compatible mod(s)");
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Mod discovery failed: " + Std.string(error));
         }
@@ -385,7 +381,7 @@ class BetterModSettingsMod {
             panels.push(panel);
             if (panelProperties != null) {
                 styleFlow(panelProperties, 4, 14, 0);
-                setHorizontalPadding(panelProperties, 64);
+                setHorizontalPadding(panelProperties, 100);
                 sizeSettingsPanel(panelProperties);
                 buildModSettings(panelProperties, mod);
             }
@@ -727,6 +723,7 @@ class BetterModSettingsMod {
             setFlowHorizontalSpacing(lineProperties, 12);
             var line:Dynamic = HlxRuntime.resolveField(lineProperties, "obj");
             applyNativeOptionLabelStyle(line);
+            disableOptionRowHover(line);
             var container:Dynamic = line == null ? null : HlxRuntime.resolveField(line, "container");
             var containerProperties:Dynamic = container == null
                 ? null
@@ -735,6 +732,28 @@ class BetterModSettingsMod {
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not create native option row: " + Std.string(error));
             return parentProperties;
+        }
+    }
+
+    static function disableOptionRowHover(line:Dynamic):Void {
+        if (line == null)
+            return;
+        try {
+            // OptionLine installs a full-row Interactive for tooltips and hover
+            // styling. Our generated rows have neither, and its hover style
+            // overwrites the copied native label scale. Hide only that overlay;
+            // the controls inside the row remain independently interactive.
+            var interactive:Dynamic = HlxRuntime.resolveField(line, "interactive");
+            if (interactive == null)
+                return;
+            if (h2dObjectType == null)
+                h2dObjectType = HlxRuntime.resolveType("h2d.Object");
+            if (h2dObjectType != null && setVisibleMember == null)
+                setVisibleMember = HlxRuntime.resolveMember(h2dObjectType, "set_visible");
+            if (setVisibleMember != null)
+                HlxRuntime.callResolved(setVisibleMember, [interactive, false]);
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not disable option row hover: " + Std.string(error));
         }
     }
 
@@ -904,7 +923,6 @@ class BetterModSettingsMod {
                 settingsPath,
                 Json.stringify(values, null, "  ")
             );
-            trace("[BetterModSettings] Saved " + key);
         } catch (error:Dynamic) {
             trace("[BetterModSettings] Could not save " + key + ": " + Std.string(error));
         }
