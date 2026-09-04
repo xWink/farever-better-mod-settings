@@ -1,6 +1,7 @@
 package bettermodsettings;
 
 import haxe.Json;
+import hlx.runtime.HlxPrefixResult;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -9,6 +10,7 @@ class BetterModSettingsMod {
     static var activeEscapeMenu:Dynamic;
     static var modSettingsButton:Dynamic;
     static var nativeSettingsWindow:Dynamic;
+    static var openingNativeSettingsWindow:Bool = false;
     static var compatibleMods:Array<Dynamic> = [];
     static var capturingKeybind:Dynamic;
     static var nativeOptionLabelStyle:Dynamic;
@@ -61,6 +63,19 @@ class BetterModSettingsMod {
     static function afterGameAppUpdate(instance:Dynamic, dt:Float, result:Void):Void {
         capturePressedKey();
         refreshPendingOptionLabelStyles();
+    }
+
+    @:hlx.prefix(ui.win.BaseWindow.closeSelfOnOpen)
+    static function keepGameMenuOpenWhileConstructingSettings(
+        instance:Dynamic,
+        openedWindow:Dynamic
+    ):HlxPrefixResult<Bool> {
+        // TitleWindow auto-displays from inside its constructor. At that point
+        // nativeSettingsWindow has not yet been assigned, so guard the brief
+        // construction phase and prevent only the active Game Menu from closing.
+        return openingNativeSettingsWindow && instance == activeEscapeMenu
+            ? SkipWith(false)
+            : Continue;
     }
 
     @:hlx.postfix(ui.win.EscapeMenu.init)
@@ -128,28 +143,27 @@ class BetterModSettingsMod {
                 return;
             }
 
+            // TitleWindow auto-displays before its constructor returns. The
+            // prefix above must be active during that call so BaseUI keeps the
+            // EscapeMenu beside this companion window.
+            openingNativeSettingsWindow = true;
             nativeSettingsWindow = HlxRuntime.constructInstanceByName(
                 titleWindowType,
                 2,
                 ["Options", null]
             );
+            openingNativeSettingsWindow = false;
             if (nativeSettingsWindow == null) {
                 trace("[BetterModSettings] Native Mod Settings window creation returned null");
                 return;
             }
 
-            // BaseWindow.closeOtherOnOpen treats a bare TitleWindow as the
-            // EscapeMenu's own window family. Preserve the menu's normal flags,
-            // then opt this detached companion window out of closing others.
+            // After construction, keep the same long-term behavior as the
+            // native Options window and EscapeMenu. The constructor-time prefix
+            // handled the one display pass that occurred before this assignment.
             var windowFlags:Dynamic = HlxRuntime.resolveField(activeEscapeMenu, "windowFlags");
-            if (windowFlags != null) {
-                var companionFlags:Int = cast windowFlags;
-                HlxRuntime.setField(
-                    nativeSettingsWindow,
-                    "windowFlags",
-                    companionFlags | 8192
-                );
-            }
+            if (windowFlags != null)
+                HlxRuntime.setField(nativeSettingsWindow, "windowFlags", windowFlags);
 
             var windowProperties:Dynamic = HlxRuntime.resolveField(nativeSettingsWindow, "dom");
             if (windowProperties == null) {
@@ -183,6 +197,7 @@ class BetterModSettingsMod {
             displayNativeSettingsWindow();
 
         } catch (error:Dynamic) {
+            openingNativeSettingsWindow = false;
             nativeSettingsWindow = null;
             trace("[BetterModSettings] Could not open native settings window: " + Std.string(error));
         }
@@ -259,11 +274,11 @@ class BetterModSettingsMod {
             if (content == null)
                 return;
             if (setMinWidthMember != null)
-                HlxRuntime.callResolved(setMinWidthMember, [content, 900]);
+                HlxRuntime.callResolved(setMinWidthMember, [content, 970]);
             if (setMinHeightMember != null)
                 HlxRuntime.callResolved(setMinHeightMember, [content, 540]);
             if (setMaxWidthMember != null)
-                HlxRuntime.callResolved(setMaxWidthMember, [content, 900]);
+                HlxRuntime.callResolved(setMaxWidthMember, [content, 970]);
             if (setMaxHeightMember != null)
                 HlxRuntime.callResolved(setMaxHeightMember, [content, 540]);
         } catch (error:Dynamic) {
@@ -289,9 +304,9 @@ class BetterModSettingsMod {
             if (body == null)
                 return;
             if (setMinWidthMember != null)
-                HlxRuntime.callResolved(setMinWidthMember, [body, 900]);
+                HlxRuntime.callResolved(setMinWidthMember, [body, 970]);
             if (setMaxWidthMember != null)
-                HlxRuntime.callResolved(setMaxWidthMember, [body, 900]);
+                HlxRuntime.callResolved(setMaxWidthMember, [body, 970]);
             if (setMinHeightMember != null)
                 HlxRuntime.callResolved(setMinHeightMember, [body, 460]);
             if (setMaxHeightMember != null)
