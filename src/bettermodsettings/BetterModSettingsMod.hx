@@ -20,6 +20,7 @@ class BetterModSettingsMod {
     static var h2dObjectType:hl.Bytes;
     static var titleWindowType:hl.Bytes;
     static var flowType:hl.Bytes;
+    static var flowAlignType:hl.Bytes;
     static var checkBoxType:hl.Bytes;
     static var buttonType:hl.Bytes;
     static var textType:hl.Bytes;
@@ -49,6 +50,7 @@ class BetterModSettingsMod {
     static var getNumChildrenMember:hlx.runtime.ResolvedMember;
     static var setFontMember:hlx.runtime.ResolvedMember;
     static var setTextColorMember:hlx.runtime.ResolvedMember;
+    static var getFlowPropertiesMember:hlx.runtime.ResolvedMember;
 
     static function main():Void {}
 
@@ -380,9 +382,9 @@ class BetterModSettingsMod {
                 : HlxRuntime.resolveField(panelProperties, "obj");
             panels.push(panel);
             if (panelProperties != null) {
-                styleFlow(panelProperties, 4, 14, 0);
+                styleFlow(panelProperties, 24, 24, 0);
                 setHorizontalPadding(panelProperties, 100);
-                setPersistentHorizontalPadding(panelProperties, 100);
+                setPersistentPanelLayout(panelProperties, 100, 24, 24);
                 sizeSettingsPanel(panelProperties);
                 buildModSettings(panelProperties, mod);
             }
@@ -512,6 +514,7 @@ class BetterModSettingsMod {
                 var check:Dynamic = checkProperties == null
                     ? null
                     : HlxRuntime.resolveField(checkProperties, "obj");
+                prepareSettingControl(settingParent, checkProperties, true);
                 if (check != null) {
                     setCheckboxValue(check, checked);
                     var targetMod = mod;
@@ -534,6 +537,7 @@ class BetterModSettingsMod {
                 var slider:Dynamic = sliderProperties == null
                     ? null
                     : HlxRuntime.resolveField(sliderProperties, "obj");
+                prepareSettingControl(settingParent, sliderProperties, false);
                 if (slider != null) {
                     var targetMod = mod;
                     var targetKey = key;
@@ -552,6 +556,7 @@ class BetterModSettingsMod {
                 var keyButton:Dynamic = keyProperties == null
                     ? null
                     : HlxRuntime.resolveField(keyProperties, "obj");
+                prepareSettingControl(settingParent, keyProperties, false);
                 if (keyButton != null) {
                     var targetMod = mod;
                     var targetKey = key;
@@ -863,35 +868,82 @@ class BetterModSettingsMod {
         }
     }
 
-    static function setPersistentHorizontalPadding(
+    static function setPersistentPanelLayout(
         properties:Dynamic,
-        padding:Int
+        horizontalPadding:Int,
+        topPadding:Int,
+        verticalSpacing:Int
     ):Void {
         if (properties == null)
             return;
         try {
-            // Flow setters are overwritten when the native Options stylesheet
-            // reflows. Inline DOMKit styles take part in that cascade and keep
-            // the custom panel inset stable.
-            if (propertiesType == null)
-                propertiesType = HlxRuntime.resolveType("domkit.Properties");
-            if (propertiesType != null && initStyleMember == null)
-                initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
-            if (initStyleMember == null)
-                return;
-            HlxRuntime.callResolved(initStyleMember, [
-                properties,
-                "padding-left",
-                padding
-            ]);
-            HlxRuntime.callResolved(initStyleMember, [
-                properties,
-                "padding-right",
-                padding
-            ]);
+            // Inline DOMKit styles survive the native Options stylesheet reflow.
+            applyInlineStyle(properties, "padding-left", horizontalPadding);
+            applyInlineStyle(properties, "padding-right", horizontalPadding);
+            applyInlineStyle(properties, "padding-top", topPadding);
+            applyInlineStyle(properties, "vspacing", verticalSpacing);
         } catch (error:Dynamic) {
-            trace("[BetterModSettings] Could not persist settings panel inset: " + Std.string(error));
+            trace("[BetterModSettings] Could not persist settings panel layout: " + Std.string(error));
         }
+    }
+
+    static function prepareSettingControl(
+        parentProperties:Dynamic,
+        controlProperties:Dynamic,
+        removeBackground:Bool
+    ):Void {
+        if (parentProperties == null || controlProperties == null)
+            return;
+        try {
+            var parent:Dynamic = HlxRuntime.resolveField(parentProperties, "obj");
+            var control:Dynamic = HlxRuntime.resolveField(controlProperties, "obj");
+            if (parent == null || control == null)
+                return;
+
+            if (flowType == null)
+                flowType = HlxRuntime.resolveType("h2d.Flow");
+            if (flowType != null && getFlowPropertiesMember == null)
+                getFlowPropertiesMember = HlxRuntime.resolveMember(flowType, "getProperties");
+            if (flowAlignType == null)
+                flowAlignType = HlxRuntime.resolveType("h2d.FlowAlign");
+
+            var middle:Dynamic = flowAlignType == null
+                ? null
+                : HlxRuntime.constructEnum(flowAlignType, "Middle", []);
+            if (middle != null) {
+                if (getFlowPropertiesMember != null) {
+                    var flowProperties:Dynamic = HlxRuntime.callResolved(
+                        getFlowPropertiesMember,
+                        [parent, control]
+                    );
+                    if (flowProperties != null)
+                        HlxRuntime.setField(flowProperties, "verticalAlign", middle);
+                }
+                applyInlineStyle(controlProperties, "valign", middle);
+            }
+
+            if (removeBackground) {
+                applyInlineStyle(controlProperties, "background-alpha", 0.0);
+                var background:Dynamic = HlxRuntime.resolveField(control, "background");
+                if (background != null)
+                    HlxRuntime.setField(background, "alpha", 0.0);
+            }
+        } catch (error:Dynamic) {
+            trace("[BetterModSettings] Could not style setting control: " + Std.string(error));
+        }
+    }
+
+    static function applyInlineStyle(
+        properties:Dynamic,
+        name:String,
+        value:Dynamic
+    ):Void {
+        if (propertiesType == null)
+            propertiesType = HlxRuntime.resolveType("domkit.Properties");
+        if (propertiesType != null && initStyleMember == null)
+            initStyleMember = HlxRuntime.resolveMember(propertiesType, "initStyle");
+        if (initStyleMember != null)
+            HlxRuntime.callResolved(initStyleMember, [properties, name, value]);
     }
 
     static function styleFlow(
